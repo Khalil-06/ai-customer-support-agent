@@ -1,8 +1,35 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel
+
+from .database import engine, Base, SessionLocal
+from . import models
+
+
+# -------------------------
+# APP SETUP
+# -------------------------
 
 app = FastAPI()
 
+Base.metadata.create_all(bind=engine)
+
+
+# -------------------------
+# DATABASE CONNECTION
+# -------------------------
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# -------------------------
+# HOME
+# -------------------------
 
 @app.get("/")
 def home():
@@ -10,6 +37,10 @@ def home():
         "message": "AI Customer Support Agent is running!"
     }
 
+
+# -------------------------
+# ORDER API
+# -------------------------
 
 orders = {
     1001: "Shipped",
@@ -20,6 +51,7 @@ orders = {
 
 @app.get("/orders/{order_id}")
 def get_order_status(order_id: int):
+
     if order_id in orders:
         return {
             "order_id": order_id,
@@ -30,6 +62,12 @@ def get_order_status(order_id: int):
         "order_id": order_id,
         "status": "Order not found"
     }
+
+
+# -------------------------
+# PRODUCT API
+# -------------------------
+
 products = {
     101: {
         "name": "Wireless Headphones",
@@ -51,6 +89,7 @@ products = {
 
 @app.get("/products/{product_id}")
 def get_product(product_id: int):
+
     if product_id in products:
         return {
             "product_id": product_id,
@@ -61,10 +100,18 @@ def get_product(product_id: int):
         "product_id": product_id,
         "message": "Product not found"
     }
+
+
+# -------------------------
+# SUPPORT TICKET API
+# -------------------------
+
 class Ticket(BaseModel):
     customer_name: str
     email: str
     issue: str
+
+
 tickets = []
 
 next_ticket_id = 1
@@ -72,6 +119,7 @@ next_ticket_id = 1
 
 @app.post("/tickets")
 def create_ticket(ticket: Ticket):
+
     global next_ticket_id
 
     new_ticket = {
@@ -83,46 +131,90 @@ def create_ticket(ticket: Ticket):
     }
 
     tickets.append(new_ticket)
+
     next_ticket_id += 1
 
     return {
         "message": "Support ticket created successfully",
         "ticket": new_ticket
     }
+
+
 @app.get("/tickets/{ticket_id}")
 def get_ticket(ticket_id: int):
+
     for ticket in tickets:
+
         if ticket["ticket_id"] == ticket_id:
             return ticket
 
     return {
         "message": "Ticket not found"
     }
-customers = {
-    1: {
-        "name": "Khalil",
-        "email": "khalil@example.com",
-        "phone": "9876543210"
-    },
-    2: {
-        "name": "Rahul",
-        "email": "rahul@example.com",
-        "phone": "9876543211"
-    },
-    3: {
-        "name": "Ayesha",
-        "email": "ayesha@example.com",
-        "phone": "9876543212"
-    }
-}
 
+
+# -------------------------
+# CUSTOMER SCHEMA
+# -------------------------
+
+class CustomerCreate(BaseModel):
+    name: str
+    email: str
+    phone: str
+
+
+# -------------------------
+# CREATE CUSTOMER
+# -------------------------
+
+@app.post("/customers")
+def create_customer(
+    customer: CustomerCreate,
+    db=Depends(get_db)
+):
+
+    new_customer = models.Customer(
+        name=customer.name,
+        email=customer.email,
+        phone=customer.phone
+    )
+
+    db.add(new_customer)
+    db.commit()
+    db.refresh(new_customer)
+
+    return {
+        "message": "Customer created successfully",
+        "customer": {
+            "id": new_customer.id,
+            "name": new_customer.name,
+            "email": new_customer.email,
+            "phone": new_customer.phone
+        }
+    }
+
+
+# -------------------------
+# GET CUSTOMER
+# -------------------------
 
 @app.get("/customers/{customer_id}")
-def get_customer(customer_id: int):
-    if customer_id in customers:
+def get_customer(
+    customer_id: int,
+    db=Depends(get_db)
+):
+
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == customer_id
+    ).first()
+
+    if customer:
+
         return {
-            "customer_id": customer_id,
-            "customer": customers[customer_id]
+            "customer_id": customer.id,
+            "name": customer.name,
+            "email": customer.email,
+            "phone": customer.phone
         }
 
     return {
