@@ -76,6 +76,20 @@ def get_current_user(
             status_code=401,
             detail="Invalid or expired token"
         )
+def require_role(required_role: str):
+
+    def role_checker(
+        current_user: dict = Depends(get_current_user)
+    ):
+        if current_user["role"] != required_role:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied"
+            )
+
+        return current_user
+
+    return role_checker
 
 # =========================================================
 # HOME
@@ -827,11 +841,11 @@ def login_user(
 # PROTECTED USER PROFILE
 # =========================================================
 
-@app.get("/me")
-def get_my_profile(
-    current_user: dict = Depends(get_current_user)
+@app.get("/admin-test")
+def admin_test(
+    current_user: dict = Depends(require_role("admin"))
 ):
     return {
-        "message": "You are authenticated",
+        "message": "Welcome Admin!",
         "user": current_user
     }
