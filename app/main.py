@@ -849,3 +849,144 @@ def admin_test(
         "message": "Welcome Admin!",
         "user": current_user
     }
+
+class ConversationCreate(BaseModel):
+    customer_id: int
+    title: str
+
+
+@app.post("/conversations")
+def create_conversation(
+    conversation: ConversationCreate,
+    db: Session = Depends(get_db)
+):
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == conversation.customer_id
+    ).first()
+
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer not found"
+        )
+
+    new_conversation = models.Conversation(
+        customer_id=conversation.customer_id,
+        title=conversation.title
+    )
+
+    db.add(new_conversation)
+    db.commit()
+    db.refresh(new_conversation)
+
+    return {
+        "message": "Conversation created successfully",
+        "conversation": {
+            "id": new_conversation.id,
+            "customer_id": new_conversation.customer_id,
+            "title": new_conversation.title
+        }
+    }
+class MessageCreate(BaseModel):
+    conversation_id: int
+    sender: str
+    message: str
+
+
+@app.post("/messages")
+def create_message(
+    message: MessageCreate,
+    db: Session = Depends(get_db)
+):
+    conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == message.conversation_id
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    new_message = models.Message(
+        conversation_id=message.conversation_id,
+        sender=message.sender,
+        message=message.message
+    )
+
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    return {
+        "message": "Message created successfully",
+        "data": {
+            "id": new_message.id,
+            "conversation_id": new_message.conversation_id,
+            "sender": new_message.sender,
+            "message": new_message.message
+        }
+    }
+@app.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(
+    conversation_id: int,
+    db: Session = Depends(get_db)
+):
+    conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == conversation_id
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    messages = db.query(models.Message).filter(
+        models.Message.conversation_id == conversation_id
+    ).order_by(
+        models.Message.id
+    ).all()
+
+    return {
+        "conversation_id": conversation_id,
+        "messages": [
+            {
+                "id": msg.id,
+                "sender": msg.sender,
+                "message": msg.message
+            }
+            for msg in messages
+        ]
+    }
+@app.get("/customers/{customer_id}/conversations")
+def get_customer_conversations(
+    customer_id: int,
+    db: Session = Depends(get_db)
+):
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == customer_id
+    ).first()
+
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer not found"
+        )
+
+    conversations = db.query(models.Conversation).filter(
+        models.Conversation.customer_id == customer_id
+    ).order_by(
+        models.Conversation.id
+    ).all()
+
+    return {
+        "customer_id": customer_id,
+        "conversations": [
+            {
+                "id": conversation.id,
+                "title": conversation.title
+            }
+            for conversation in conversations
+        ]
+    }
