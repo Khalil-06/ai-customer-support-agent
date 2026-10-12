@@ -990,3 +990,70 @@ def get_customer_conversations(
             for conversation in conversations
         ]
     }
+class ChatRequest(BaseModel):
+    conversation_id: int
+    message: str
+@app.post("/chat")
+def chat(
+    request: ChatRequest,
+    db: Session = Depends(get_db)
+):
+    conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == request.conversation_id
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    # Save customer message
+    customer_message = models.Message(
+        conversation_id=request.conversation_id,
+        sender="customer",
+        message=request.message
+    )
+
+    db.add(customer_message)
+    db.commit()
+    db.refresh(customer_message)
+
+    # Temporary AI response
+    ai_reply = (
+        "I have received your message and checked "
+        "your conversation history."
+    )
+
+    # Save AI response
+    ai_message = models.Message(
+        conversation_id=request.conversation_id,
+        sender="ai",
+        message=ai_reply
+    )
+
+    db.add(ai_message)
+    db.commit()
+    db.refresh(ai_message)
+
+    # Get complete conversation history
+    messages = db.query(models.Message).filter(
+        models.Message.conversation_id == request.conversation_id
+    ).order_by(
+        models.Message.id
+    ).all()
+
+    history = [
+        {
+            "sender": msg.sender,
+            "message": msg.message
+        }
+        for msg in messages
+    ]
+
+    return {
+        "conversation_id": request.conversation_id,
+        "user_message": request.message,
+        "reply": ai_reply,
+        "history": history
+    }
