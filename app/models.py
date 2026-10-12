@@ -4,6 +4,10 @@ from sqlalchemy.orm import relationship
 from .database import Base
 
 
+# =========================
+# CUSTOMER
+# =========================
+
 class Customer(Base):
     __tablename__ = "customers"
 
@@ -11,23 +15,51 @@ class Customer(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     phone = Column(String)
-    orders = relationship("Order", back_populates="customer")
-    tickets = relationship("Ticket", back_populates="customer")
 
+    orders = relationship(
+        "Order",
+        back_populates="customer"
+    )
+
+    tickets = relationship(
+        "Ticket",
+        back_populates="customer"
+    )
+
+    conversations = relationship(
+        "Conversation",
+        back_populates="customer"
+    )
+
+
+# =========================
+# ORDER
+# =========================
 
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, unique=True, nullable=False, index=True)
-    customer_id = Column(
-    Integer,
-    ForeignKey("customers.id"),
-    nullable=False
-)
 
-    customer = relationship("Customer", back_populates="orders")
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id"),
+        nullable=False
+    )
+
     status = Column(String, nullable=False)
+
+    customer = relationship(
+        "Customer",
+        back_populates="orders"
+    )
+
+
+# =========================
+# PRODUCT
+# =========================
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -35,6 +67,12 @@ class Product(Base):
     product_id = Column(Integer, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False)
     price = Column(Integer, nullable=False)
+
+
+# =========================
+# TICKET
+# =========================
+
 class Ticket(Base):
     __tablename__ = "tickets"
 
@@ -51,7 +89,16 @@ class Ticket(Base):
     description = Column(String, nullable=False)
     status = Column(String, nullable=False)
 
-    customer = relationship("Customer", back_populates="tickets")
+    customer = relationship(
+        "Customer",
+        back_populates="tickets"
+    )
+
+
+# =========================
+# USER
+# =========================
+
 class User(Base):
     __tablename__ = "users"
 
@@ -60,3 +107,55 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False, default="customer")
+
+
+# =========================
+# CONVERSATION
+# =========================
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id"),
+        nullable=False
+    )
+
+    title = Column(String, nullable=False)
+
+    customer = relationship(
+        "Customer",
+        back_populates="conversations"
+    )
+
+    messages = relationship(
+        "Message",
+        back_populates="conversation"
+    )
+
+
+# =========================
+# MESSAGE
+# =========================
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    conversation_id = Column(
+        Integer,
+        ForeignKey("conversations.id"),
+        nullable=False
+    )
+
+    sender = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+
+    conversation = relationship(
+        "Conversation",
+        back_populates="messages"
+    )

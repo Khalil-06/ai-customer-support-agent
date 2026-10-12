@@ -1,6 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+import logging
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .database import engine, SessionLocal, Base
@@ -9,6 +11,9 @@ from . import models
 from .security import hash_password, verify_password
 from .auth import create_access_token, decode_access_token
 
+from .ai import generate_ai_response
+
+from .rag import generate_rag_response
 
 # =========================================================
 # CREATE DATABASE TABLES
@@ -26,6 +31,34 @@ app = FastAPI(
     description="Backend API for an AI-powered customer support system",
     version="1.0.0"
 )
+
+# =========================================================
+# GLOBAL ERROR HANDLER
+# =========================================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unexpected error: {exc}")
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "message": "Something went wrong. Please try again later."
+        }
+    )
+
+
+# =========================================================
+# LOGGING
+# =========================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 
 # =========================================================
@@ -97,6 +130,8 @@ def require_role(required_role: str):
 
 @app.get("/")
 def home():
+    logger.info("Home endpoint accessed")
+
     return {
         "message": "AI Customer Support Agent is running"
     }
@@ -107,15 +142,15 @@ def home():
 # =========================================================
 
 class CustomerCreate(BaseModel):
-    name: str
-    email: str
-    phone: str
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    phone: str = Field(min_length=7, max_length=20)
 
 
 class CustomerUpdate(BaseModel):
-    name: str
-    email: str
-    phone: str
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    phone: str = Field(min_length=7, max_length=20)
 
 
 # =========================================================
@@ -315,13 +350,13 @@ def get_customer_tickets(
 # =========================================================
 
 class OrderCreate(BaseModel):
-    order_id: int
-    customer_id: int
-    status: str
+    order_id: int = Field(gt=0)
+    customer_id: int = Field(gt=0)
+    status: str = Field(min_length=1, max_length=50)
 
 
 class OrderUpdate(BaseModel):
-    status: str
+    status: str = Field(min_length=1, max_length=50)
 
 
 # =========================================================
@@ -454,14 +489,14 @@ def delete_order(
 # =========================================================
 
 class ProductCreate(BaseModel):
-    product_id: int
-    name: str
-    price: int
+    product_id: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=200)
+    price: int = Field(ge=0)
 
 
 class ProductUpdate(BaseModel):
-    name: str
-    price: int
+    name: str = Field(min_length=1, max_length=200)
+    price: int = Field(ge=0)
 
 
 # =========================================================
@@ -585,17 +620,17 @@ def delete_product(
 # =========================================================
 
 class TicketCreate(BaseModel):
-    ticket_id: int
-    customer_id: int
-    subject: str
-    description: str
-    status: str
+    ticket_id: int = Field(gt=0)
+    customer_id: int = Field(gt=0)
+    subject: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=5000)
+    status: str = Field(min_length=1, max_length=50)
 
 
 class TicketUpdate(BaseModel):
-    subject: str
-    description: str
-    status: str
+    subject: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=5000)
+    status: str = Field(min_length=1, max_length=50)
 
 
 # =========================================================
@@ -738,10 +773,10 @@ def delete_ticket(
 # =========================================================
 
 class UserCreate(BaseModel):
-    name: str
-    email: str
-    password: str
-    role: str = "customer"
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(default="customer", min_length=1, max_length=20)
 
 
 @app.post("/register")
@@ -788,8 +823,8 @@ def register_user(
 # =========================================================
 
 class UserLogin(BaseModel):
-    email: str
-    password: str
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
 
 
 @app.post("/login")
@@ -851,8 +886,8 @@ def admin_test(
     }
 
 class ConversationCreate(BaseModel):
-    customer_id: int
-    title: str
+    customer_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=200)
 
 
 @app.post("/conversations")
@@ -888,9 +923,9 @@ def create_conversation(
         }
     }
 class MessageCreate(BaseModel):
-    conversation_id: int
-    sender: str
-    message: str
+    conversation_id: int = Field(gt=0)
+    sender: str = Field(min_length=1, max_length=50)
+    message: str = Field(min_length=1, max_length=5000)
 
 
 @app.post("/messages")
@@ -991,8 +1026,8 @@ def get_customer_conversations(
         ]
     }
 class ChatRequest(BaseModel):
-    conversation_id: int
-    message: str
+    conversation_id: int = Field(gt=0)
+    message: str = Field(min_length=1, max_length=1000)
 @app.post("/chat")
 def chat(
     request: ChatRequest,
@@ -1020,11 +1055,7 @@ def chat(
     db.refresh(customer_message)
 
     # Temporary AI response
-    ai_reply = (
-        "I have received your message and checked "
-        "your conversation history."
-    )
-
+    ai_reply = generate_rag_response(request.message)
     # Save AI response
     ai_message = models.Message(
         conversation_id=request.conversation_id,
