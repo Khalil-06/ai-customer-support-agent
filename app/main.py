@@ -12,41 +12,7 @@ from .security import hash_password, verify_password
 from .auth import create_access_token, decode_access_token
 
 from .ai import generate_ai_response
-
 from .rag import generate_rag_response
-
-# =========================================================
-# CREATE DATABASE TABLES
-# =========================================================
-
-Base.metadata.create_all(bind=engine)
-
-
-# =========================================================
-# FASTAPI APP
-# =========================================================
-
-app = FastAPI(
-    title="AI Customer Support Agent",
-    description="Backend API for an AI-powered customer support system",
-    version="1.0.0"
-)
-
-# =========================================================
-# GLOBAL ERROR HANDLER
-# =========================================================
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unexpected error: {exc}")
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "message": "Something went wrong. Please try again later."
-        }
-    )
 
 
 # =========================================================
@@ -59,6 +25,124 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =========================================================
+# FASTAPI APP
+# =========================================================
+
+app = FastAPI(
+    title="AI Customer Support Agent",
+    description="Backend API for an AI-powered customer support system",
+    version="1.0.0"
+)
+
+
+# =========================================================
+# CREATE DATABASE TABLES
+# =========================================================
+
+Base.metadata.create_all(bind=engine)
+
+
+# =========================================================
+# PYDANTIC REQUEST MODELS
+# =========================================================
+
+class CustomerCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    phone: str = Field(min_length=7, max_length=20)
+
+
+class TicketCreate(BaseModel):
+    ticket_id: int = Field(gt=0)
+    customer_id: int = Field(gt=0)
+    subject: str = Field(min_length=2, max_length=200)
+    description: str = Field(min_length=5, max_length=2000)
+    status: str = Field(
+        default="Open",
+        min_length=1,
+        max_length=50
+    )
+
+
+class OrderCreate(BaseModel):
+    order_id: int = Field(gt=0)
+    customer_id: int = Field(gt=0)
+    status: str = Field(min_length=1, max_length=50)
+
+
+class OrderUpdate(BaseModel):
+    status: str = Field(min_length=1, max_length=50)
+
+
+class UserCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(
+        default="customer",
+        min_length=1,
+        max_length=20
+    )
+    company_id: int | None = Field(
+        default=None,
+        gt=0
+    )
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class ConversationCreate(BaseModel):
+    customer_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=200)
+
+
+class MessageCreate(BaseModel):
+    conversation_id: int = Field(gt=0)
+    sender: str = Field(min_length=1, max_length=50)
+    message: str = Field(min_length=1, max_length=5000)
+
+
+class ChatRequest(BaseModel):
+    conversation_id: int = Field(gt=0)
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class CompanyCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=255)
+    website: str | None = None
+
+
+# =========================================================
+# GLOBAL ERROR HANDLER
+# =========================================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(
+    request: Request,
+    exc: Exception
+):
+    print("\n================ REAL ERROR ================\n")
+    print(f"Error: {exc}")
+
+    import traceback
+    traceback.print_exc()
+
+    print("\n============================================\n")
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "message": str(exc)
+        }
+    )
 
 
 # =========================================================
@@ -77,6 +161,7 @@ def get_db():
 # =========================================================
 # JWT AUTHENTICATION
 # =========================================================
+
 security = HTTPBearer()
 
 
@@ -88,9 +173,16 @@ def get_current_user(
     try:
         payload = decode_access_token(token)
 
+        if not payload:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired token"
+            )
+
         user_id = payload.get("sub")
         email = payload.get("email")
         role = payload.get("role")
+        company_id = payload.get("company_id")
 
         if user_id is None or email is None:
             raise HTTPException(
@@ -101,14 +193,24 @@ def get_current_user(
         return {
             "id": int(user_id),
             "email": email,
-            "role": role
+            "role": role,
+            "company_id": company_id
         }
+
+    except HTTPException:
+        raise
 
     except Exception:
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token"
         )
+
+
+# =========================================================
+# ROLE CHECK
+# =========================================================
+
 def require_role(required_role: str):
 
     def role_checker(
@@ -124,6 +226,7 @@ def require_role(required_role: str):
 
     return role_checker
 
+
 # =========================================================
 # HOME
 # =========================================================
@@ -138,19 +241,78 @@ def home():
 
 
 # =========================================================
-# CUSTOMER SCHEMAS
+# COMPANY APIs
 # =========================================================
 
-class CustomerCreate(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
-    email: str = Field(min_length=5, max_length=255)
-    phone: str = Field(min_length=7, max_length=20)
+@app.post("/companies")
+def create_company(
+    company: CompanyCreate,
+    db: Session = Depends(get_db)
+):
+    existing_company = db.query(models.Company).filter(
+        models.Company.email == company.email
+    ).first()
+
+    if existing_company:
+        raise HTTPException(
+            status_code=400,
+            detail="Company email already registered"
+        )
+
+    new_company = models.Company(
+        name=company.name,
+        email=company.email,
+        website=company.website
+    )
+
+    db.add(new_company)
+    db.commit()
+    db.refresh(new_company)
+
+    return {
+        "message": "Company created successfully",
+        "company": {
+            "id": new_company.id,
+            "name": new_company.name,
+            "email": new_company.email,
+            "website": new_company.website
+        }
+    }
 
 
-class CustomerUpdate(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
-    email: str = Field(min_length=5, max_length=255)
-    phone: str = Field(min_length=7, max_length=20)
+@app.post("/companies/register")
+def register_company(
+    company: CompanyCreate,
+    db: Session = Depends(get_db)
+):
+    existing_company = db.query(models.Company).filter(
+        models.Company.email == company.email
+    ).first()
+
+    if existing_company:
+        raise HTTPException(
+            status_code=400,
+            detail="Company email already registered"
+        )
+
+    new_company = models.Company(
+        name=company.name,
+        email=company.email,
+        website=company.website
+    )
+
+    db.add(new_company)
+    db.commit()
+    db.refresh(new_company)
+
+    return {
+        "message": "Company registration successful",
+        "company": {
+            "id": new_company.id,
+            "name": new_company.name,
+            "email": new_company.email
+        }
+    }
 
 
 # =========================================================
@@ -160,22 +322,33 @@ class CustomerUpdate(BaseModel):
 @app.post("/customers")
 def create_customer(
     customer: CustomerCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
     existing_customer = db.query(models.Customer).filter(
-        models.Customer.email == customer.email
+        models.Customer.email == customer.email,
+        models.Customer.company_id == company_id
     ).first()
 
     if existing_customer:
         raise HTTPException(
             status_code=400,
-            detail="Email already registered"
+            detail="Customer email already exists"
         )
 
     new_customer = models.Customer(
         name=customer.name,
         email=customer.email,
-        phone=customer.phone
+        phone=customer.phone,
+        company_id=company_id
     )
 
     db.add(new_customer)
@@ -188,18 +361,35 @@ def create_customer(
             "id": new_customer.id,
             "name": new_customer.name,
             "email": new_customer.email,
-            "phone": new_customer.phone
+            "phone": new_customer.phone,
+            "company_id": new_customer.company_id
         }
     }
+
+
+@app.get("/customers")
+def get_customers(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    customers = db.query(models.Customer).filter(
+        models.Customer.company_id == company_id
+    ).all()
+
+    return customers
 
 
 @app.get("/customers/{customer_id}")
 def get_customer(
     customer_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not customer:
@@ -208,22 +398,19 @@ def get_customer(
             detail="Customer not found"
         )
 
-    return {
-        "id": customer.id,
-        "name": customer.name,
-        "email": customer.email,
-        "phone": customer.phone
-    }
+    return customer
 
 
 @app.put("/customers/{customer_id}")
 def update_customer(
     customer_id: int,
-    customer: CustomerUpdate,
-    db: Session = Depends(get_db)
+    customer: CustomerCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     existing_customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not existing_customer:
@@ -239,24 +426,18 @@ def update_customer(
     db.commit()
     db.refresh(existing_customer)
 
-    return {
-        "message": "Customer updated successfully",
-        "customer": {
-            "id": existing_customer.id,
-            "name": existing_customer.name,
-            "email": existing_customer.email,
-            "phone": existing_customer.phone
-        }
-    }
+    return existing_customer
 
 
 @app.delete("/customers/{customer_id}")
 def delete_customer(
     customer_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     existing_customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not existing_customer:
@@ -280,10 +461,12 @@ def delete_customer(
 @app.get("/customers/{customer_id}/orders")
 def get_customer_orders(
     customer_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not customer:
@@ -293,7 +476,8 @@ def get_customer_orders(
         )
 
     orders = db.query(models.Order).filter(
-        models.Order.customer_id == customer_id
+        models.Order.customer_id == customer_id,
+        models.Order.company_id == current_user["company_id"]
     ).all()
 
     return {
@@ -315,10 +499,12 @@ def get_customer_orders(
 @app.get("/customers/{customer_id}/tickets")
 def get_customer_tickets(
     customer_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not customer:
@@ -328,7 +514,8 @@ def get_customer_tickets(
         )
 
     tickets = db.query(models.Ticket).filter(
-        models.Ticket.customer_id == customer_id
+        models.Ticket.customer_id == customer_id,
+        models.Ticket.company_id == current_user["company_id"]
     ).all()
 
     return {
@@ -346,30 +533,26 @@ def get_customer_tickets(
 
 
 # =========================================================
-# ORDER SCHEMAS
-# =========================================================
-
-class OrderCreate(BaseModel):
-    order_id: int = Field(gt=0)
-    customer_id: int = Field(gt=0)
-    status: str = Field(min_length=1, max_length=50)
-
-
-class OrderUpdate(BaseModel):
-    status: str = Field(min_length=1, max_length=50)
-
-
-# =========================================================
 # ORDER APIs
 # =========================================================
 
 @app.post("/orders")
 def create_order(
     order: OrderCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
     customer = db.query(models.Customer).filter(
-        models.Customer.id == order.customer_id
+        models.Customer.id == order.customer_id,
+        models.Customer.company_id == company_id
     ).first()
 
     if not customer:
@@ -379,7 +562,8 @@ def create_order(
         )
 
     existing_order = db.query(models.Order).filter(
-        models.Order.order_id == order.order_id
+        models.Order.order_id == order.order_id,
+        models.Order.company_id == company_id
     ).first()
 
     if existing_order:
@@ -391,7 +575,8 @@ def create_order(
     new_order = models.Order(
         order_id=order.order_id,
         customer_id=order.customer_id,
-        status=order.status
+        status=order.status,
+        company_id=company_id
     )
 
     db.add(new_order)
@@ -403,7 +588,8 @@ def create_order(
         "order": {
             "order_id": new_order.order_id,
             "customer_id": new_order.customer_id,
-            "status": new_order.status
+            "status": new_order.status,
+            "company_id": new_order.company_id
         }
     }
 
@@ -411,10 +597,14 @@ def create_order(
 @app.get("/orders/{order_id}")
 def get_order(
     order_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     order = db.query(models.Order).filter(
-        models.Order.order_id == order_id
+        models.Order.order_id == order_id,
+        models.Order.company_id == company_id
     ).first()
 
     if not order:
@@ -426,7 +616,8 @@ def get_order(
     return {
         "order_id": order.order_id,
         "customer_id": order.customer_id,
-        "status": order.status
+        "status": order.status,
+        "company_id": order.company_id
     }
 
 
@@ -434,10 +625,14 @@ def get_order(
 def update_order(
     order_id: int,
     order: OrderUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     existing_order = db.query(models.Order).filter(
-        models.Order.order_id == order_id
+        models.Order.order_id == order_id,
+        models.Order.company_id == company_id
     ).first()
 
     if not existing_order:
@@ -456,7 +651,8 @@ def update_order(
         "order": {
             "order_id": existing_order.order_id,
             "customer_id": existing_order.customer_id,
-            "status": existing_order.status
+            "status": existing_order.status,
+            "company_id": existing_order.company_id
         }
     }
 
@@ -464,10 +660,14 @@ def update_order(
 @app.delete("/orders/{order_id}")
 def delete_order(
     order_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     existing_order = db.query(models.Order).filter(
-        models.Order.order_id == order_id
+        models.Order.order_id == order_id,
+        models.Order.company_id == company_id
     ).first()
 
     if not existing_order:
@@ -485,165 +685,26 @@ def delete_order(
 
 
 # =========================================================
-# PRODUCT SCHEMAS
-# =========================================================
-
-class ProductCreate(BaseModel):
-    product_id: int = Field(gt=0)
-    name: str = Field(min_length=1, max_length=200)
-    price: int = Field(ge=0)
-
-
-class ProductUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
-    price: int = Field(ge=0)
-
-
-# =========================================================
-# PRODUCT APIs
-# =========================================================
-
-@app.post("/products")
-def create_product(
-    product: ProductCreate,
-    db: Session = Depends(get_db)
-):
-    existing_product = db.query(models.Product).filter(
-        models.Product.product_id == product.product_id
-    ).first()
-
-    if existing_product:
-        raise HTTPException(
-            status_code=400,
-            detail="Product ID already exists"
-        )
-
-    new_product = models.Product(
-        product_id=product.product_id,
-        name=product.name,
-        price=product.price
-    )
-
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-
-    return {
-        "message": "Product created successfully",
-        "product": {
-            "product_id": new_product.product_id,
-            "name": new_product.name,
-            "price": new_product.price
-        }
-    }
-
-
-@app.get("/products/{product_id}")
-def get_product(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    product = db.query(models.Product).filter(
-        models.Product.product_id == product_id
-    ).first()
-
-    if not product:
-        return {
-            "product_id": product_id,
-            "message": "Product not found"
-        }
-
-    return {
-        "product_id": product.product_id,
-        "name": product.name,
-        "price": product.price
-    }
-
-
-@app.put("/products/{product_id}")
-def update_product(
-    product_id: int,
-    product: ProductUpdate,
-    db: Session = Depends(get_db)
-):
-    existing_product = db.query(models.Product).filter(
-        models.Product.product_id == product_id
-    ).first()
-
-    if not existing_product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
-    existing_product.name = product.name
-    existing_product.price = product.price
-
-    db.commit()
-    db.refresh(existing_product)
-
-    return {
-        "message": "Product updated successfully",
-        "product": {
-            "product_id": existing_product.product_id,
-            "name": existing_product.name,
-            "price": existing_product.price
-        }
-    }
-
-
-@app.delete("/products/{product_id}")
-def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    existing_product = db.query(models.Product).filter(
-        models.Product.product_id == product_id
-    ).first()
-
-    if not existing_product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
-    db.delete(existing_product)
-    db.commit()
-
-    return {
-        "message": "Product deleted successfully"
-    }
-
-
-# =========================================================
-# TICKET SCHEMAS
-# =========================================================
-
-class TicketCreate(BaseModel):
-    ticket_id: int = Field(gt=0)
-    customer_id: int = Field(gt=0)
-    subject: str = Field(min_length=1, max_length=200)
-    description: str = Field(min_length=1, max_length=5000)
-    status: str = Field(min_length=1, max_length=50)
-
-
-class TicketUpdate(BaseModel):
-    subject: str = Field(min_length=1, max_length=200)
-    description: str = Field(min_length=1, max_length=5000)
-    status: str = Field(min_length=1, max_length=50)
-
-
-# =========================================================
 # TICKET APIs
 # =========================================================
 
 @app.post("/tickets")
 def create_ticket(
     ticket: TicketCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
     customer = db.query(models.Customer).filter(
-        models.Customer.id == ticket.customer_id
+        models.Customer.id == ticket.customer_id,
+        models.Customer.company_id == company_id
     ).first()
 
     if not customer:
@@ -653,7 +714,8 @@ def create_ticket(
         )
 
     existing_ticket = db.query(models.Ticket).filter(
-        models.Ticket.ticket_id == ticket.ticket_id
+        models.Ticket.ticket_id == ticket.ticket_id,
+        models.Ticket.company_id == company_id
     ).first()
 
     if existing_ticket:
@@ -667,7 +729,8 @@ def create_ticket(
         customer_id=ticket.customer_id,
         subject=ticket.subject,
         description=ticket.description,
-        status=ticket.status
+        status=ticket.status,
+        company_id=company_id
     )
 
     db.add(new_ticket)
@@ -681,7 +744,8 @@ def create_ticket(
             "customer_id": new_ticket.customer_id,
             "subject": new_ticket.subject,
             "description": new_ticket.description,
-            "status": new_ticket.status
+            "status": new_ticket.status,
+            "company_id": new_ticket.company_id
         }
     }
 
@@ -689,35 +753,44 @@ def create_ticket(
 @app.get("/tickets/{ticket_id}")
 def get_ticket(
     ticket_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     ticket = db.query(models.Ticket).filter(
-        models.Ticket.ticket_id == ticket_id
+        models.Ticket.ticket_id == ticket_id,
+        models.Ticket.company_id == company_id
     ).first()
 
     if not ticket:
-        return {
-            "ticket_id": ticket_id,
-            "message": "Ticket not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Ticket not found"
+        )
 
     return {
         "ticket_id": ticket.ticket_id,
         "customer_id": ticket.customer_id,
         "subject": ticket.subject,
         "description": ticket.description,
-        "status": ticket.status
+        "status": ticket.status,
+        "company_id": ticket.company_id
     }
 
 
 @app.put("/tickets/{ticket_id}")
 def update_ticket(
     ticket_id: int,
-    ticket: TicketUpdate,
-    db: Session = Depends(get_db)
+    ticket: TicketCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     existing_ticket = db.query(models.Ticket).filter(
-        models.Ticket.ticket_id == ticket_id
+        models.Ticket.ticket_id == ticket_id,
+        models.Ticket.company_id == company_id
     ).first()
 
     if not existing_ticket:
@@ -740,7 +813,8 @@ def update_ticket(
             "customer_id": existing_ticket.customer_id,
             "subject": existing_ticket.subject,
             "description": existing_ticket.description,
-            "status": existing_ticket.status
+            "status": existing_ticket.status,
+            "company_id": existing_ticket.company_id
         }
     }
 
@@ -748,10 +822,14 @@ def update_ticket(
 @app.delete("/tickets/{ticket_id}")
 def delete_ticket(
     ticket_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     existing_ticket = db.query(models.Ticket).filter(
-        models.Ticket.ticket_id == ticket_id
+        models.Ticket.ticket_id == ticket_id,
+        models.Ticket.company_id == company_id
     ).first()
 
     if not existing_ticket:
@@ -772,13 +850,6 @@ def delete_ticket(
 # USER REGISTRATION
 # =========================================================
 
-class UserCreate(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
-    email: str = Field(min_length=5, max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-    role: str = Field(default="customer", min_length=1, max_length=20)
-
-
 @app.post("/register")
 def register_user(
     user: UserCreate,
@@ -794,13 +865,25 @@ def register_user(
             detail="Email already registered"
         )
 
+    if user.company_id is not None:
+        company = db.query(models.Company).filter(
+            models.Company.id == user.company_id
+        ).first()
+
+        if not company:
+            raise HTTPException(
+                status_code=404,
+                detail="Company not found"
+            )
+
     hashed_password = hash_password(user.password)
 
     new_user = models.User(
         name=user.name,
         email=user.email,
         hashed_password=hashed_password,
-        role=user.role
+        role=user.role,
+        company_id=user.company_id
     )
 
     db.add(new_user)
@@ -813,7 +896,8 @@ def register_user(
             "id": new_user.id,
             "name": new_user.name,
             "email": new_user.email,
-            "role": new_user.role
+            "role": new_user.role,
+            "company_id": new_user.company_id
         }
     }
 
@@ -822,16 +906,13 @@ def register_user(
 # USER LOGIN
 # =========================================================
 
-class UserLogin(BaseModel):
-    email: str = Field(min_length=5, max_length=255)
-    password: str = Field(min_length=1, max_length=128)
-
-
 @app.post("/login")
 def login_user(
-    user: UserLogin,
+    user: LoginRequest,
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Login attempt for: {user.email}")
+
     existing_user = db.query(models.User).filter(
         models.User.email == user.email
     ).first()
@@ -842,38 +923,44 @@ def login_user(
             detail="Invalid email or password"
         )
 
-    password_correct = verify_password(
+    if not verify_password(
         user.password,
         existing_user.hashed_password
-    )
-
-    if not password_correct:
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
-    access_token = create_access_token({
-        "sub": str(existing_user.id),
-        "email": existing_user.email,
-        "role": existing_user.role
-    })
+    token = create_access_token(
+        data={
+            "sub": str(existing_user.id),
+            "email": existing_user.email,
+            "role": existing_user.role,
+            "company_id": existing_user.company_id
+        }
+    )
+
+    logger.info(
+        f"Login successful for user ID: {existing_user.id}"
+    )
 
     return {
         "message": "Login successful",
-        "access_token": access_token,
+        "access_token": token,
         "token_type": "bearer",
         "user": {
             "id": existing_user.id,
             "name": existing_user.name,
             "email": existing_user.email,
-            "role": existing_user.role
+            "role": existing_user.role,
+            "company_id": existing_user.company_id
         }
     }
 
 
 # =========================================================
-# PROTECTED USER PROFILE
+# ADMIN TEST
 # =========================================================
 
 @app.get("/admin-test")
@@ -885,18 +972,22 @@ def admin_test(
         "user": current_user
     }
 
-class ConversationCreate(BaseModel):
-    customer_id: int = Field(gt=0)
-    title: str = Field(min_length=1, max_length=200)
 
+# =========================================================
+# CONVERSATIONS
+# =========================================================
 
 @app.post("/conversations")
 def create_conversation(
     conversation: ConversationCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     customer = db.query(models.Customer).filter(
-        models.Customer.id == conversation.customer_id
+        models.Customer.id == conversation.customer_id,
+        models.Customer.company_id == company_id
     ).first()
 
     if not customer:
@@ -922,19 +1013,24 @@ def create_conversation(
             "title": new_conversation.title
         }
     }
-class MessageCreate(BaseModel):
-    conversation_id: int = Field(gt=0)
-    sender: str = Field(min_length=1, max_length=50)
-    message: str = Field(min_length=1, max_length=5000)
 
+
+# =========================================================
+# MESSAGES
+# =========================================================
 
 @app.post("/messages")
 def create_message(
     message: MessageCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).filter(
-        models.Conversation.id == message.conversation_id
+    conversation = db.query(models.Conversation).join(
+        models.Customer,
+        models.Customer.id == models.Conversation.customer_id
+    ).filter(
+        models.Conversation.id == message.conversation_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not conversation:
@@ -962,13 +1058,20 @@ def create_message(
             "message": new_message.message
         }
     }
+
+
 @app.get("/conversations/{conversation_id}/messages")
 def get_conversation_messages(
     conversation_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).filter(
-        models.Conversation.id == conversation_id
+    conversation = db.query(models.Conversation).join(
+        models.Customer,
+        models.Customer.id == models.Conversation.customer_id
+    ).filter(
+        models.Conversation.id == conversation_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not conversation:
@@ -994,13 +1097,17 @@ def get_conversation_messages(
             for msg in messages
         ]
     }
+
+
 @app.get("/customers/{customer_id}/conversations")
 def get_customer_conversations(
     customer_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id
+        models.Customer.id == customer_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not customer:
@@ -1025,16 +1132,24 @@ def get_customer_conversations(
             for conversation in conversations
         ]
     }
-class ChatRequest(BaseModel):
-    conversation_id: int = Field(gt=0)
-    message: str = Field(min_length=1, max_length=1000)
+
+
+# =========================================================
+# AI CHAT
+# =========================================================
+
 @app.post("/chat")
 def chat(
     request: ChatRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).filter(
-        models.Conversation.id == request.conversation_id
+    conversation = db.query(models.Conversation).join(
+        models.Customer,
+        models.Customer.id == models.Conversation.customer_id
+    ).filter(
+        models.Conversation.id == request.conversation_id,
+        models.Customer.company_id == current_user["company_id"]
     ).first()
 
     if not conversation:
@@ -1054,8 +1169,9 @@ def chat(
     db.commit()
     db.refresh(customer_message)
 
-    # Temporary AI response
+    # Generate AI response
     ai_reply = generate_rag_response(request.message)
+
     # Save AI response
     ai_message = models.Message(
         conversation_id=request.conversation_id,
@@ -1067,7 +1183,7 @@ def chat(
     db.commit()
     db.refresh(ai_message)
 
-    # Get complete conversation history
+    # Get conversation history
     messages = db.query(models.Message).filter(
         models.Message.conversation_id == request.conversation_id
     ).order_by(

@@ -5,6 +5,19 @@ from .database import Base
 
 
 # =========================
+# COMPANY / BUSINESS
+# =========================
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    website = Column(String, nullable=True)
+
+
+# =========================
 # CUSTOMER
 # =========================
 
@@ -15,6 +28,22 @@ class Customer(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     phone = Column(String)
+
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company = relationship("Company")
+
+    orders = relationship("Order", back_populates="customer")
+    tickets = relationship("Ticket", back_populates="customer")
+    conversations = relationship("Conversation", back_populates="customer")
+
+    # SaaS company ownership
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False
+    )
+
+    company = relationship("Company")
 
     orders = relationship(
         "Order",
@@ -31,7 +60,6 @@ class Customer(Base):
         back_populates="customer"
     )
 
-
 # =========================
 # ORDER
 # =========================
@@ -41,20 +69,13 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, unique=True, nullable=False, index=True)
-
-    customer_id = Column(
-        Integer,
-        ForeignKey("customers.id"),
-        nullable=False
-    )
-
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     status = Column(String, nullable=False)
 
-    customer = relationship(
-        "Customer",
-        back_populates="orders"
-    )
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company = relationship("Company")
 
+    customer = relationship("Customer", back_populates="orders")
 
 # =========================
 # PRODUCT
@@ -108,7 +129,13 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False, default="customer")
 
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=True
+    )
 
+    company = relationship("Company")
 # =========================
 # CONVERSATION
 # =========================
