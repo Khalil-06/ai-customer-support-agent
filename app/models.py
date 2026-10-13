@@ -110,10 +110,14 @@ class Ticket(Base):
     description = Column(String, nullable=False)
     status = Column(String, nullable=False)
 
-    customer = relationship(
-        "Customer",
-        back_populates="tickets"
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False
     )
+
+    company = relationship("Company")
+    customer = relationship("Customer", back_populates="tickets")
 
 
 # =========================
