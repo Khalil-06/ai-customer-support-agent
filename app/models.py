@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -16,6 +16,8 @@ class Company(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     website = Column(String, nullable=True)
 
+    plan_id = Column(Integer, ForeignKey("plan.id"), nullable=True)
+    plan = relationship("Plan")
 
 # =========================
 # CUSTOMER
@@ -148,26 +150,14 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-
-    customer_id = Column(
-        Integer,
-        ForeignKey("customers.id"),
-        nullable=False
-    )
-
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     title = Column(String, nullable=False)
 
-    customer = relationship(
-        "Customer",
-        back_populates="conversations"
-    )
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company = relationship("Company")
 
-    messages = relationship(
-        "Message",
-        back_populates="conversation"
-    )
-
-
+    customer = relationship("Customer", back_populates="conversations")
+    messages = relationship("Message", back_populates="conversation")
 # =========================
 # MESSAGE
 # =========================
@@ -190,3 +180,43 @@ class Message(Base):
         "Conversation",
         back_populates="messages"
     )
+    # =========================
+# COMPANY USAGE
+# =========================
+
+class CompanyUsage(Base):
+    __tablename__ = "company_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False,
+        unique=True
+    )
+
+    ai_messages_used = Column(Integer, nullable=False, default=0)
+    customers_used = Column(Integer, nullable=False, default=0)
+    documents_used = Column(Integer, nullable=False, default=0)
+
+    company = relationship("Company")
+
+# =========================
+# PLAN
+# =========================
+
+class Plan(Base):
+    __tablename__ = "plan"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(String(50), nullable=False)
+
+    price_monthly = Column(Numeric(10, 2), nullable=False)
+
+    max_cutomers = Column(Integer, nullable=False, default=100)
+
+    max_ai_messages = Column(Integer, nullable=False, default=100)
+
+    max_documents = Column(Integer, nullable=False, default=5)

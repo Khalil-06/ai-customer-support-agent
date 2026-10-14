@@ -13,7 +13,7 @@ from .auth import create_access_token, decode_access_token
 
 from .ai import generate_ai_response
 from .rag import generate_rag_response
-
+from fastapi import HTTPException
 
 # =========================================================
 # LOGGING
@@ -985,6 +985,12 @@ def create_conversation(
 ):
     company_id = current_user["company_id"]
 
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
     customer = db.query(models.Customer).filter(
         models.Customer.id == conversation.customer_id,
         models.Customer.company_id == company_id
@@ -998,7 +1004,8 @@ def create_conversation(
 
     new_conversation = models.Conversation(
         customer_id=conversation.customer_id,
-        title=conversation.title
+        title=conversation.title,
+        company_id=company_id
     )
 
     db.add(new_conversation)
@@ -1010,7 +1017,8 @@ def create_conversation(
         "conversation": {
             "id": new_conversation.id,
             "customer_id": new_conversation.customer_id,
-            "title": new_conversation.title
+            "title": new_conversation.title,
+            "company_id": new_conversation.company_id
         }
     }
 
@@ -1025,12 +1033,11 @@ def create_message(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).join(
-        models.Customer,
-        models.Customer.id == models.Conversation.customer_id
-    ).filter(
+    company_id = current_user["company_id"]
+
+    conversation = db.query(models.Conversation).filter(
         models.Conversation.id == message.conversation_id,
-        models.Customer.company_id == current_user["company_id"]
+        models.Conversation.company_id == company_id
     ).first()
 
     if not conversation:
@@ -1066,12 +1073,11 @@ def get_conversation_messages(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).join(
-        models.Customer,
-        models.Customer.id == models.Conversation.customer_id
-    ).filter(
+    company_id = current_user["company_id"]
+
+    conversation = db.query(models.Conversation).filter(
         models.Conversation.id == conversation_id,
-        models.Customer.company_id == current_user["company_id"]
+        models.Conversation.company_id == company_id
     ).first()
 
     if not conversation:
@@ -1105,9 +1111,11 @@ def get_customer_conversations(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    company_id = current_user["company_id"]
+
     customer = db.query(models.Customer).filter(
         models.Customer.id == customer_id,
-        models.Customer.company_id == current_user["company_id"]
+        models.Customer.company_id == company_id
     ).first()
 
     if not customer:
@@ -1117,7 +1125,8 @@ def get_customer_conversations(
         )
 
     conversations = db.query(models.Conversation).filter(
-        models.Conversation.customer_id == customer_id
+        models.Conversation.customer_id == customer_id,
+        models.Conversation.company_id == company_id
     ).order_by(
         models.Conversation.id
     ).all()
@@ -1127,13 +1136,51 @@ def get_customer_conversations(
         "conversations": [
             {
                 "id": conversation.id,
-                "title": conversation.title
+                "title": conversation.title,
+                "company_id": conversation.company_id
             }
             for conversation in conversations
         ]
     }
 
+def check_ai_message_limit(db: Session, company_id: int):
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
 
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
+
+    if not usage:
+        usage = models.CompanyUsage(company_id=company_id)
+        db.add(usage)
+        db.commit()
+        db.refresh(usage)
+
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == company.plan_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    if usage.ai_messages_used >= plan.max_ai_messages:
+        raise HTTPException(
+            status_code=429,
+            detail="AI message limit reached for your plan"
+        )
+
+    return usage
 # =========================================================
 # AI CHAT
 # =========================================================
@@ -1144,12 +1191,11 @@ def chat(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    conversation = db.query(models.Conversation).join(
-        models.Customer,
-        models.Customer.id == models.Conversation.customer_id
-    ).filter(
+    company_id = current_user["company_id"]
+
+    conversation = db.query(models.Conversation).filter(
         models.Conversation.id == request.conversation_id,
-        models.Customer.company_id == current_user["company_id"]
+        models.Conversation.company_id == company_id
     ).first()
 
     if not conversation:
@@ -1170,7 +1216,7 @@ def chat(
     db.refresh(customer_message)
 
     # Generate AI response
-    ai_reply = generate_rag_response(request.message)
+    ai_reply = generate_rag_response(request.message, company_id)
 
     # Save AI response
     ai_message = models.Message(

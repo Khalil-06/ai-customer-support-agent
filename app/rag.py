@@ -2,8 +2,8 @@ from .search_documents import search_documents
 from .ai import client
 
 
-def generate_rag_response(question: str) -> str:
-    results = search_documents(question)
+def generate_rag_response(question: str, company_id: int) -> str:
+    results = search_documents(question, company_id)
 
     context = ""
 
@@ -35,12 +35,3 @@ Rules:
     )
 
     return response.text
-
-
-if __name__ == "__main__":
-    question = "How many days do I have to return a product?"
-
-    answer = generate_rag_response(question)
-
-    print("\nAI ANSWER:")
-    print(answer)
