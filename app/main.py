@@ -318,7 +318,6 @@ def register_company(
 # =========================================================
 # CUSTOMER APIs
 # =========================================================
-
 @app.post("/customers")
 def create_customer(
     customer: CustomerCreate,
@@ -333,6 +332,41 @@ def create_customer(
             detail="User is not associated with a company"
         )
 
+    # Get company
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    # Get company's plan
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == company.plan_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    # Count current customers
+    customer_count = db.query(models.Customer).filter(
+        models.Customer.company_id == company_id
+    ).count()
+
+    # Check plan limit
+    if customer_count >= plan.max_cutomers:
+        raise HTTPException(
+            status_code=429,
+            detail="Customer limit reached for your plan"
+        )
+
+    # Check duplicate email
     existing_customer = db.query(models.Customer).filter(
         models.Customer.email == customer.email,
         models.Customer.company_id == company_id
@@ -344,6 +378,7 @@ def create_customer(
             detail="Customer email already exists"
         )
 
+    # Create customer
     new_customer = models.Customer(
         name=customer.name,
         email=customer.email,
@@ -365,94 +400,6 @@ def create_customer(
             "company_id": new_customer.company_id
         }
     }
-
-
-@app.get("/customers")
-def get_customers(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    company_id = current_user["company_id"]
-
-    customers = db.query(models.Customer).filter(
-        models.Customer.company_id == company_id
-    ).all()
-
-    return customers
-
-
-@app.get("/customers/{customer_id}")
-def get_customer(
-    customer_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id,
-        models.Customer.company_id == current_user["company_id"]
-    ).first()
-
-    if not customer:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found"
-        )
-
-    return customer
-
-
-@app.put("/customers/{customer_id}")
-def update_customer(
-    customer_id: int,
-    customer: CustomerCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    existing_customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id,
-        models.Customer.company_id == current_user["company_id"]
-    ).first()
-
-    if not existing_customer:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found"
-        )
-
-    existing_customer.name = customer.name
-    existing_customer.email = customer.email
-    existing_customer.phone = customer.phone
-
-    db.commit()
-    db.refresh(existing_customer)
-
-    return existing_customer
-
-
-@app.delete("/customers/{customer_id}")
-def delete_customer(
-    customer_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    existing_customer = db.query(models.Customer).filter(
-        models.Customer.id == customer_id,
-        models.Customer.company_id == current_user["company_id"]
-    ).first()
-
-    if not existing_customer:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found"
-        )
-
-    db.delete(existing_customer)
-    db.commit()
-
-    return {
-        "message": "Customer deleted successfully"
-    }
-
 
 # =========================================================
 # CUSTOMER ORDERS
@@ -901,7 +848,100 @@ def register_user(
         }
     }
 
+# =========================================================
+# COMPANY ONBOARDING
+# =========================================================
 
+@app.post("/companies/onboard")
+def onboard_company(
+    company_name: str,
+    company_email: str,
+    owner_name: str,
+    owner_email: str,
+    owner_password: str,
+    db: Session = Depends(get_db)
+):
+    # Check company email
+    existing_company = db.query(models.Company).filter(
+        models.Company.email == company_email
+    ).first()
+
+    if existing_company:
+        raise HTTPException(
+            status_code=400,
+            detail="Company email already registered"
+        )
+
+    # Check owner email
+    existing_user = db.query(models.User).filter(
+        models.User.email == owner_email
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Owner email already registered"
+        )
+
+    # Get Free plan
+    free_plan = db.query(models.Plan).filter(
+        models.Plan.name == "free"
+    ).first()
+
+    if not free_plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Free plan not configured"
+        )
+
+    # Create company
+    company = models.Company(
+        name=company_name,
+        email=company_email,
+        plan_id=free_plan.id
+    )
+
+    db.add(company)
+    db.flush()
+
+    # Create owner
+    owner = models.User(
+        name=owner_name,
+        email=owner_email,
+        hashed_password=hash_password(owner_password),
+        role="owner",
+        company_id=company.id
+    )
+
+    db.add(owner)
+
+    # Create usage record
+    usage = models.CompanyUsage(
+        company_id=company.id
+    )
+
+    db.add(usage)
+
+    db.commit()
+
+    db.refresh(company)
+    db.refresh(owner)
+
+    return {
+        "message": "Company onboarded successfully",
+        "company": {
+            "id": company.id,
+            "name": company.name,
+            "email": company.email,
+            "plan": free_plan.name
+        },
+        "owner": {
+            "id": owner.id,
+            "name": owner.name,
+            "email": owner.email,
+            "role": owner.role
+        }
+    }
 # =========================================================
 # USER LOGIN
 # =========================================================
@@ -1249,4 +1289,279 @@ def chat(
         "user_message": request.message,
         "reply": ai_reply,
         "history": history
+    }
+# =========================================================
+# DOCUMENT UPLOAD
+# =========================================================
+
+from fastapi import UploadFile, File
+import shutil
+import os
+from sqlalchemy import text
+from .store_pdf import store_pdf
+
+@app.post("/documents/upload")
+def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    # Get company
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    # Get plan
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == company.plan_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    # Count existing documents
+    document_count = db.execute(
+        text("""
+            SELECT COUNT(DISTINCT document_name)
+            FROM document_chunks
+            WHERE company_id = :company_id
+        """),
+        {"company_id": company_id}
+    ).scalar()
+
+    # Check document limit
+    if document_count >= plan.max_documents:
+        raise HTTPException(
+            status_code=429,
+            detail="Document limit reached for your plan"
+        )
+
+    # Validate PDF
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed"
+        )
+
+    os.makedirs("documents", exist_ok=True)
+
+    file_path = os.path.join(
+        "documents",
+        f"{company_id}_{file.filename}"
+    )
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Store PDF chunks with company isolation
+    store_pdf(
+        file_path,
+        file.filename,
+        company_id
+    )
+
+    return {
+        "message": "Document uploaded successfully",
+        "document_name": file.filename,
+        "company_id": company_id
+    }
+
+# =========================================================
+# SAAS USAGE / PLAN
+# =========================================================
+
+@app.get("/saas/usage")
+def get_saas_usage(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == company.plan_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
+
+    if not usage:
+        usage = models.CompanyUsage(company_id=company_id)
+        db.add(usage)
+        db.commit()
+        db.refresh(usage)
+
+    customer_count = db.query(models.Customer).filter(
+        models.Customer.company_id == company_id
+    ).count()
+
+    document_count = db.execute(
+        text("""
+            SELECT COUNT(DISTINCT document_name)
+            FROM document_chunks
+            WHERE company_id = :company_id
+        """),
+        {"company_id": company_id}
+    ).scalar()
+
+    return {
+        "company_id": company_id,
+        "plan": {
+            "name": plan.name,
+            "price_monthly": float(plan.price_monthly)
+        },
+        "usage": {
+            "customers": customer_count,
+            "ai_messages": usage.ai_messages_used,
+            "documents": document_count
+        },
+        "limits": {
+            "customers": plan.max_cutomers,
+            "ai_messages": plan.max_ai_messages,
+            "documents": plan.max_documents
+        }
+    }
+@app.get("/saas/plan")
+def get_current_plan(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == company.plan_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    return {
+        "company": {
+            "id": company.id,
+            "name": company.name
+        },
+        "plan": {
+            "id": plan.id,
+            "name": plan.name,
+            "price_monthly": float(plan.price_monthly),
+            "max_customers": plan.max_cutomers,
+            "max_ai_messages": plan.max_ai_messages,
+            "max_documents": plan.max_documents
+        }
+    }
+@app.put("/saas/plan")
+def change_plan(
+    plan_name: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    # Only company owner can change the plan
+    if current_user["role"] != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only company owner can change the plan"
+        )
+
+    company = db.query(models.Company).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Company not found"
+        )
+
+    new_plan = db.query(models.Plan).filter(
+        models.Plan.name == plan_name.lower()
+    ).first()
+
+    if not new_plan:
+        raise HTTPException(
+            status_code=404,
+            detail="Plan not found"
+        )
+
+    company.plan_id = new_plan.id
+
+    db.commit()
+    db.refresh(company)
+
+    return {
+        "message": "Plan changed successfully",
+        "company_id": company.id,
+        "plan": {
+            "id": new_plan.id,
+            "name": new_plan.name,
+            "price_monthly": float(new_plan.price_monthly),
+            "max_customers": new_plan.max_cutomers,
+            "max_ai_messages": new_plan.max_ai_messages,
+            "max_documents": new_plan.max_documents
+        }
     }

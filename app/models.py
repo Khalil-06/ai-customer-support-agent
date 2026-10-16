@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 
 from .database import Base
 
-
+from datetime import datetime
 # =========================
 # COMPANY / BUSINESS
 # =========================
@@ -220,3 +220,25 @@ class Plan(Base):
     max_ai_messages = Column(Integer, nullable=False, default=100)
 
     max_documents = Column(Integer, nullable=False, default=5)
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False,
+        unique=True
+    )
+    plan_id = Column(
+        Integer,
+        ForeignKey("plan.id"),
+        nullable=False
+    )
+
+    status = Column(String(30), nullable=False, default="trial")
+    started_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+    company = relationship("Company")
+    plan = relationship("Plan")
