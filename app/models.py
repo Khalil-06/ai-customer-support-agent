@@ -1,9 +1,19 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Numeric
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    Numeric,
+    DateTime,
+)
+
 from sqlalchemy.orm import relationship
 
 from .database import Base
 
 from datetime import datetime
+
+
 # =========================
 # COMPANY / BUSINESS
 # =========================
@@ -19,6 +29,7 @@ class Company(Base):
     plan_id = Column(Integer, ForeignKey("plan.id"), nullable=True)
     plan = relationship("Plan")
 
+
 # =========================
 # CUSTOMER
 # =========================
@@ -31,14 +42,6 @@ class Customer(Base):
     email = Column(String, unique=True, nullable=False)
     phone = Column(String)
 
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
-    company = relationship("Company")
-
-    orders = relationship("Order", back_populates="customer")
-    tickets = relationship("Ticket", back_populates="customer")
-    conversations = relationship("Conversation", back_populates="customer")
-
-    # SaaS company ownership
     company_id = Column(
         Integer,
         ForeignKey("companies.id"),
@@ -62,6 +65,7 @@ class Customer(Base):
         back_populates="customer"
     )
 
+
 # =========================
 # ORDER
 # =========================
@@ -71,13 +75,28 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, unique=True, nullable=False, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id"),
+        nullable=False
+    )
+
     status = Column(String, nullable=False)
 
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False
+    )
+
     company = relationship("Company")
 
-    customer = relationship("Customer", back_populates="orders")
+    customer = relationship(
+        "Customer",
+        back_populates="orders"
+    )
+
 
 # =========================
 # PRODUCT
@@ -119,7 +138,11 @@ class Ticket(Base):
     )
 
     company = relationship("Company")
-    customer = relationship("Customer", back_populates="tickets")
+
+    customer = relationship(
+        "Customer",
+        back_populates="tickets"
+    )
 
 
 # =========================
@@ -132,8 +155,14 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
+
     hashed_password = Column(String, nullable=False)
-    role = Column(String, nullable=False, default="customer")
+
+    role = Column(
+        String,
+        nullable=False,
+        default="customer"
+    )
 
     company_id = Column(
         Integer,
@@ -142,6 +171,8 @@ class User(Base):
     )
 
     company = relationship("Company")
+
+
 # =========================
 # CONVERSATION
 # =========================
@@ -150,14 +181,34 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id"),
+        nullable=False
+    )
+
     title = Column(String, nullable=False)
 
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False
+    )
+
     company = relationship("Company")
 
-    customer = relationship("Customer", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation")
+    customer = relationship(
+        "Customer",
+        back_populates="conversations"
+    )
+
+    messages = relationship(
+        "Message",
+        back_populates="conversation"
+    )
+
+
 # =========================
 # MESSAGE
 # =========================
@@ -180,7 +231,9 @@ class Message(Base):
         "Conversation",
         back_populates="messages"
     )
-    # =========================
+
+
+# =========================
 # COMPANY USAGE
 # =========================
 
@@ -196,11 +249,26 @@ class CompanyUsage(Base):
         unique=True
     )
 
-    ai_messages_used = Column(Integer, nullable=False, default=0)
-    customers_used = Column(Integer, nullable=False, default=0)
-    documents_used = Column(Integer, nullable=False, default=0)
+    ai_messages_used = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    customers_used = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    documents_used = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
 
     company = relationship("Company")
+
 
 # =========================
 # PLAN
@@ -211,34 +279,73 @@ class Plan(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(String(50), nullable=False)
+    name = Column(
+        String(50),
+        nullable=False
+    )
 
-    price_monthly = Column(Numeric(10, 2), nullable=False)
+    price_monthly = Column(
+        Numeric(10, 2),
+        nullable=False
+    )
 
-    max_cutomers = Column(Integer, nullable=False, default=100)
+    max_cutomers = Column(
+        Integer,
+        nullable=False,
+        default=100
+    )
 
-    max_ai_messages = Column(Integer, nullable=False, default=100)
+    max_ai_messages = Column(
+        Integer,
+        nullable=False,
+        default=100
+    )
 
-    max_documents = Column(Integer, nullable=False, default=5)
+    max_documents = Column(
+        Integer,
+        nullable=False,
+        default=5
+    )
+
+
+# =========================
+# SUBSCRIPTION
+# =========================
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
+
     company_id = Column(
         Integer,
         ForeignKey("companies.id"),
         nullable=False,
         unique=True
     )
+
     plan_id = Column(
         Integer,
         ForeignKey("plan.id"),
         nullable=False
     )
 
-    status = Column(String(30), nullable=False, default="trial")
-    started_at = Column(DateTime, nullable=True)
-    expires_at = Column(DateTime, nullable=True)
+    status = Column(
+        String(30),
+        nullable=False,
+        default="trial"
+    )
+
+    started_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    expires_at = Column(
+        DateTime,
+        nullable=True
+    )
 
     company = relationship("Company")
+
     plan = relationship("Plan")

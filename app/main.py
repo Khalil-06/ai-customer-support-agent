@@ -1,20 +1,19 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
-import logging
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+import logging
+import os
+import shutil
 
 from .database import engine, SessionLocal, Base
 from . import models
-
-from .security import hash_password, verify_password
 from .auth import create_access_token, decode_access_token
-
-from .ai import generate_ai_response
+from .security import hash_password, verify_password
 from .rag import generate_rag_response
-from fastapi import HTTPException
-
+from .store_pdf import store_pdf
 # =========================================================
 # LOGGING
 # =========================================================
@@ -136,11 +135,13 @@ async def global_exception_handler(
 
     print("\n============================================\n")
 
+    logger.exception("Unhandled application error", exc_info=exc)
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "message": str(exc)
+            "message": "An unexpected error occurred"
         }
     )
 
@@ -1233,6 +1234,15 @@ def chat(
 ):
     company_id = current_user["company_id"]
 
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    # Check the company's AI usage limit before processing the request.
+    usage = check_ai_message_limit(db, company_id)
+
     conversation = db.query(models.Conversation).filter(
         models.Conversation.id == request.conversation_id,
         models.Conversation.company_id == company_id
@@ -1257,6 +1267,10 @@ def chat(
 
     # Generate AI response
     ai_reply = generate_rag_response(request.message, company_id)
+
+    # Count one successful AI message against the company's plan.
+    usage.ai_messages_used += 1
+    db.commit()
 
     # Save AI response
     ai_message = models.Message(
@@ -1293,12 +1307,6 @@ def chat(
 # =========================================================
 # DOCUMENT UPLOAD
 # =========================================================
-
-from fastapi import UploadFile, File
-import shutil
-import os
-from sqlalchemy import text
-from .store_pdf import store_pdf
 
 @app.post("/documents/upload")
 def upload_document(
