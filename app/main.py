@@ -8,6 +8,8 @@ import logging
 import os
 import shutil
 
+from sympy import python
+
 from .database import engine, SessionLocal, Base
 from . import models
 from .auth import create_access_token, decode_access_token
@@ -479,6 +481,192 @@ def get_customer_tickets(
         ]
     }
 
+# =========================
+# PRODUCT APIs
+# =========================
+
+class ProductCreate(BaseModel):
+    product_id: int
+    name: str
+    price: int
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    price: int | None = None
+
+
+@app.post("/products")
+def create_product(
+    product: ProductCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    existing_product = db.query(models.Product).filter(
+        models.Product.product_id == product.product_id,
+        models.Product.company_id == company_id
+    ).first()
+
+    if existing_product:
+        raise HTTPException(
+            status_code=400,
+            detail="Product ID already exists for this company"
+        )
+
+    new_product = models.Product(
+        product_id=product.product_id,
+        name=product.name,
+        price=product.price,
+        company_id=company_id
+    )
+
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
+
+    return {
+        "message": "Product created successfully",
+        "product": {
+            "id": new_product.id,
+            "product_id": new_product.product_id,
+            "name": new_product.name,
+            "price": new_product.price,
+            "company_id": new_product.company_id
+        }
+    }
+
+
+@app.get("/products")
+def get_products(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    products = db.query(models.Product).filter(
+        models.Product.company_id == company_id
+    ).all()
+
+    return [
+        {
+            "id": product.id,
+            "product_id": product.product_id,
+            "name": product.name,
+            "price": product.price,
+            "company_id": product.company_id
+        }
+        for product in products
+    ]
+
+
+@app.get("/products/{product_id}")
+def get_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    product = db.query(models.Product).filter(
+        models.Product.product_id == product_id,
+        models.Product.company_id == company_id
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    return {
+        "id": product.id,
+        "product_id": product.product_id,
+        "name": product.name,
+        "price": product.price,
+        "company_id": product.company_id
+    }
+
+
+@app.put("/products/{product_id}")
+def update_product(
+    product_id: int,
+    product: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    existing_product = db.query(models.Product).filter(
+        models.Product.product_id == product_id,
+        models.Product.company_id == company_id
+    ).first()
+
+    if not existing_product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    if product.name is not None:
+        existing_product.name = product.name
+
+    if product.price is not None:
+        existing_product.price = product.price
+
+    db.commit()
+    db.refresh(existing_product)
+
+    return {
+        "message": "Product updated successfully",
+        "product": {
+            "id": existing_product.id,
+            "product_id": existing_product.product_id,
+            "name": existing_product.name,
+            "price": existing_product.price,
+            "company_id": existing_product.company_id
+        }
+    }
+
+
+@app.delete("/products/{product_id}")
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    product = db.query(models.Product).filter(
+        models.Product.product_id == product_id,
+        models.Product.company_id == company_id
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    db.delete(product)
+    db.commit()
+
+    return {
+        "message": "Product deleted successfully"
+    }
 
 # =========================================================
 # ORDER APIs

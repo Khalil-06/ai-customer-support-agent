@@ -106,9 +106,31 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, unique=True, nullable=False, index=True)
-    name = Column(String, nullable=False)
-    price = Column(Integer, nullable=False)
+
+    product_id = Column(
+        Integer,
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    price = Column(
+        Integer,
+        nullable=False
+    )
+
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False
+    )
+
+    company = relationship("Company")
 
 
 # =========================

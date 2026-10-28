@@ -3,7 +3,7 @@ from .ai import client
 from sqlalchemy import text
 
 
-def search_product(product_name: str):
+def search_product(product_name: str, company_id: int):
     db = SessionLocal()
 
     try:
@@ -11,10 +11,14 @@ def search_product(product_name: str):
             text("""
                 SELECT product_id, name, price
                 FROM products
-                WHERE LOWER(name) LIKE LOWER(:name)
+                WHERE company_id = :company_id
+                  AND LOWER(name) LIKE LOWER(:name)
                 LIMIT 5
             """),
-            {"name": f"%{product_name}%"}
+            {
+                "company_id": company_id,
+                "name": f"%{product_name}%"
+            }
         ).fetchall()
 
         return [
@@ -30,8 +34,11 @@ def search_product(product_name: str):
         db.close()
 
 
-def answer_product_question(product_name: str):
-    products = search_product(product_name)
+def answer_product_question(product_name: str, company_id: int):
+    products = search_product(
+        product_name,
+        company_id
+    )
 
     if not products:
         return f"Sorry, I couldn't find a product matching '{product_name}'."
@@ -67,4 +74,9 @@ Keep the answer short and friendly.
 
 
 if __name__ == "__main__":
-    print(answer_product_question("phone"))
+    print(
+        answer_product_question(
+            "phone",
+            1
+        )
+    )
