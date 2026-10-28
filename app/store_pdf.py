@@ -1,12 +1,8 @@
-from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
 
 from .database import SessionLocal
 from .pdf_reader import extract_text_from_pdf
 from .chunker import chunk_text
-
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def store_pdf(file_path: str, document_name: str, company_id: int):
@@ -17,30 +13,27 @@ def store_pdf(file_path: str, document_name: str, company_id: int):
 
     try:
         for chunk in chunks:
-            embedding = model.encode(chunk).tolist()
-
             db.execute(
-    text("""
-        INSERT INTO document_chunks
-        (document_name, chunk_text, embedding, company_id)
-        VALUES
-        (:document_name, :chunk_text,
-         CAST(:embedding AS vector),
-         :company_id)
-    """),
-    {
-        "document_name": document_name,
-        "chunk_text": chunk,
-        "embedding": str(embedding),
-        "company_id": company_id
-    }
-)
+                text("""
+                    INSERT INTO document_chunks
+                    (document_name, chunk_text, company_id)
+                    VALUES
+                    (:document_name, :chunk_text, :company_id)
+                """),
+                {
+                    "document_name": document_name,
+                    "chunk_text": chunk,
+                    "company_id": company_id
+                }
+            )
+
         db.commit()
 
         print(f"Stored {len(chunks)} chunks successfully.")
 
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     store_pdf(

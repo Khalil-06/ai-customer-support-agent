@@ -1,13 +1,9 @@
-from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
-from .database import SessionLocal
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+from .database import SessionLocal
 
 
 def search_faq(question: str, company_id: int):
-    embedding = model.encode(question).tolist()
-
     db = SessionLocal()
 
     try:
@@ -15,17 +11,18 @@ def search_faq(question: str, company_id: int):
             text("""
                 SELECT
                     question,
-                    answer,
-                    embedding <=> CAST(:embedding AS vector) AS distance
+                    answer
                 FROM faqs
-                WHERE embedding IS NOT NULL
-                  AND company_id = :company_id
-                ORDER BY embedding <=> CAST(:embedding AS vector)
-                LIMIT 3
+                WHERE company_id = :company_id
+                  AND (
+                      question ILIKE :q1
+                      OR answer ILIKE :q1
+                  )
+                LIMIT 5
             """),
             {
-                "embedding": str(embedding),
-                "company_id": company_id
+                "company_id": company_id,
+                "q1": f"%{question}%"
             }
         )
 
@@ -36,10 +33,11 @@ def search_faq(question: str, company_id: int):
 
 
 if __name__ == "__main__":
-    question = "When will my package arrive?"
+    results = search_faq(
+        "How can I return a product?",
+        company_id=1
+    )
 
-    results = search_faq(question, company_id=1)
     for row in results:
         print("\nQuestion:", row.question)
         print("Answer:", row.answer)
-        print("Distance:", row.distance)

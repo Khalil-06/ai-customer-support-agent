@@ -1,39 +1,49 @@
-from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
+
 from .database import SessionLocal
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
 
-
-def create_embeddings():
+def create_faq_entries():
     db = SessionLocal()
 
     try:
-        rows = db.execute(
-            text("SELECT id, question, answer FROM faqs")
-        ).fetchall()
+        faqs = [
+            {
+                "question": "How many days do I have to return a product?",
+                "answer": "Products can be returned within 7 days of delivery."
+            },
+            {
+                "question": "How can I contact customer support?",
+                "answer": "You can contact customer support through the support chat."
+            },
+            {
+                "question": "How long does delivery take?",
+                "answer": "Standard delivery usually takes 3 to 5 business days."
+            }
+        ]
 
-        for row in rows:
-            embedding = model.encode(row.question).tolist()
-
+        for faq in faqs:
             db.execute(
                 text("""
-                    UPDATE faqs
-                    SET embedding = :embedding
-                    WHERE id = :id
+                    INSERT INTO faqs
+                    (question, answer, company_id)
+                    VALUES
+                    (:question, :answer, :company_id)
                 """),
                 {
-                    "embedding": str(embedding),
-                    "id": row.id
+                    "question": faq["question"],
+                    "answer": faq["answer"],
+                    "company_id": 1
                 }
             )
 
         db.commit()
-        print(f"Embeddings created for {len(rows)} FAQs.")
+
+        print(f"Stored {len(faqs)} FAQs successfully.")
 
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    create_embeddings()
+    create_faq_entries()
