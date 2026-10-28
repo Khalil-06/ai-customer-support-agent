@@ -7,7 +7,7 @@ from sqlalchemy import text
 import logging
 import os
 import shutil
-
+from datetime import datetime, timedelta
 from sympy import python
 
 from .database import engine, SessionLocal, Base
@@ -1106,11 +1106,22 @@ def onboard_company(
 
     # Create usage record
     usage = models.CompanyUsage(
-        company_id=company.id
-    )
+    company_id=company.id
+)
 
     db.add(usage)
 
+    # Create subscription
+    subscription = models.Subscription(
+    company_id=company.id,
+    plan_id=free_plan.id,
+    status="trial",
+    started_at=datetime.utcnow(),
+    expires_at=datetime.utcnow() + timedelta(days=14)
+)
+
+    db.add(subscription)
+  
     db.commit()
 
     db.refresh(company)
