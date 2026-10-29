@@ -1,3 +1,5 @@
+from .usage import check_customer_limit
+from .usage import check_ai_message_limit
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -82,17 +84,15 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: str = Field(min_length=5, max_length=255)
     password: str = Field(min_length=8, max_length=128)
-    role: str = Field(
-        default="customer",
-        min_length=1,
-        max_length=20
-    )
-    company_id: int | None = Field(
-        default=None,
-        gt=0
-    )
 
-
+class CompanyRegister(BaseModel):
+    company_name: str = Field(min_length=2, max_length=150)
+    company_email: str = Field(min_length=5, max_length=255)
+    owner_name: str = Field(min_length=2, max_length=100)
+    owner_email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    website: str | None = None
+    
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=255)
     password: str = Field(min_length=8, max_length=128)
@@ -283,44 +283,13 @@ def create_company(
     }
 
 
-@app.post("/companies/register")
-def register_company(
-    company: CompanyCreate,
-    db: Session = Depends(get_db)
-):
-    existing_company = db.query(models.Company).filter(
-        models.Company.email == company.email
-    ).first()
 
-    if existing_company:
-        raise HTTPException(
-            status_code=400,
-            detail="Company email already registered"
-        )
-
-    new_company = models.Company(
-        name=company.name,
-        email=company.email,
-        website=company.website
-    )
-
-    db.add(new_company)
-    db.commit()
-    db.refresh(new_company)
-
-    return {
-        "message": "Company registration successful",
-        "company": {
-            "id": new_company.id,
-            "name": new_company.name,
-            "email": new_company.email
-        }
-    }
 
 
 # =========================================================
 # CUSTOMER APIs
 # =========================================================
+
 @app.post("/customers")
 def create_customer(
     customer: CustomerCreate,
@@ -346,7 +315,7 @@ def create_customer(
             detail="Company not found"
         )
 
-    # Get company's plan
+    # Get company plan
     plan = db.query(models.Plan).filter(
         models.Plan.id == company.plan_id
     ).first()
@@ -357,13 +326,23 @@ def create_customer(
             detail="Company plan not configured"
         )
 
-    # Count current customers
-    customer_count = db.query(models.Customer).filter(
-        models.Customer.company_id == company_id
-    ).count()
+    # Get usage record
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
 
-    # Check plan limit
-    if customer_count >= plan.max_cutomers:
+    if not usage:
+        usage = models.CompanyUsage(
+            company_id=company_id,
+            ai_messages_used=0,
+            customers_used=0,
+            documents_used=0
+        )
+        db.add(usage)
+        db.flush()
+
+    # Check customer limit
+    if usage.customers_used >= plan.max_cutomers:
         raise HTTPException(
             status_code=429,
             detail="Customer limit reached for your plan"
@@ -390,6 +369,10 @@ def create_customer(
     )
 
     db.add(new_customer)
+
+    # Increase usage
+    usage.customers_used += 1
+
     db.commit()
     db.refresh(new_customer)
 
@@ -1001,16 +984,6 @@ def register_user(
             detail="Email already registered"
         )
 
-    if user.company_id is not None:
-        company = db.query(models.Company).filter(
-            models.Company.id == user.company_id
-        ).first()
-
-        if not company:
-            raise HTTPException(
-                status_code=404,
-                detail="Company not found"
-            )
 
     hashed_password = hash_password(user.password)
 
@@ -1018,8 +991,8 @@ def register_user(
         name=user.name,
         email=user.email,
         hashed_password=hashed_password,
-        role=user.role,
-        company_id=user.company_id
+        role="customer",
+        company_id=None
     )
 
     db.add(new_user)
@@ -1036,7 +1009,113 @@ def register_user(
             "company_id": new_user.company_id
         }
     }
+@app.post("/companies/register")
+def register_company(
+    data: CompanyRegister,
+    db: Session = Depends(get_db)
+):
+    # Check company email
+    existing_company = db.query(models.Company).filter(
+        models.Company.email == data.company_email
+    ).first()
 
+    if existing_company:
+        raise HTTPException(
+            status_code=400,
+            detail="Company email already registered"
+        )
+
+    # Check owner email
+    existing_user = db.query(models.User).filter(
+        models.User.email == data.owner_email
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Owner email already registered"
+        )
+
+    # Get Free plan
+    free_plan = db.query(models.Plan).filter(
+        models.Plan.name == "free"
+    ).first()
+
+    if not free_plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Free plan is not configured"
+        )
+
+    try:
+        # Create company
+        company = models.Company(
+            name=data.company_name,
+            email=data.company_email,
+            website=data.website,
+            plan_id=free_plan.id
+        )
+
+        db.add(company)
+        db.flush()
+
+        # Create owner
+        owner = models.User(
+            name=data.owner_name,
+            email=data.owner_email,
+            hashed_password=hash_password(data.password),
+            role="owner",
+            company_id=company.id
+        )
+
+        db.add(owner)
+
+        # Create usage record
+        usage = models.CompanyUsage(
+            company_id=company.id,
+            ai_messages_used=0,
+            customers_used=0,
+            documents_used=0
+        )
+
+        db.add(usage)
+
+        db.commit()
+
+        db.refresh(company)
+        db.refresh(owner)
+
+        # Create login token
+        token = create_access_token({
+            "user_id": owner.id,
+            "company_id": company.id,
+            "role": owner.role
+        })
+
+        return {
+            "message": "Company registered successfully",
+            "company": {
+                "id": company.id,
+                "name": company.name,
+                "email": company.email,
+                "plan": free_plan.name
+            },
+            "owner": {
+                "id": owner.id,
+                "name": owner.name,
+                "email": owner.email,
+                "role": owner.role
+            },
+            "access_token": token,
+            "token_type": "bearer"
+        }
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Company registration failed"
+        )
 # =========================================================
 # COMPANY ONBOARDING
 # =========================================================
@@ -1425,7 +1504,7 @@ def check_ai_message_limit(db: Session, company_id: int):
 # AI CHAT
 # =========================================================
 
-@app.post("/chat")
+@app.post("/ai/chat")
 def chat(
     request: ChatRequest,
     db: Session = Depends(get_db),
@@ -1503,10 +1582,6 @@ def chat(
         "reply": ai_reply,
         "history": history
     }
-# =========================================================
-# DOCUMENT UPLOAD
-# =========================================================
-
 @app.post("/documents/upload")
 def upload_document(
     file: UploadFile = File(...),
@@ -1543,18 +1618,24 @@ def upload_document(
             detail="Company plan not configured"
         )
 
-    # Count existing documents
-    document_count = db.execute(
-        text("""
-            SELECT COUNT(DISTINCT document_name)
-            FROM document_chunks
-            WHERE company_id = :company_id
-        """),
-        {"company_id": company_id}
-    ).scalar()
+    # Get usage record
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
+
+    if not usage:
+        usage = models.CompanyUsage(
+            company_id=company_id,
+            ai_messages_used=0,
+            customers_used=0,
+            documents_used=0
+        )
+
+        db.add(usage)
+        db.flush()
 
     # Check document limit
-    if document_count >= plan.max_documents:
+    if usage.documents_used >= plan.max_documents:
         raise HTTPException(
             status_code=429,
             detail="Document limit reached for your plan"
@@ -1584,10 +1665,17 @@ def upload_document(
         company_id
     )
 
+    # Increase document usage
+    usage.documents_used += 1
+
+    db.commit()
+
     return {
         "message": "Document uploaded successfully",
         "document_name": file.filename,
-        "company_id": company_id
+        "company_id": company_id,
+        "documents_used": usage.documents_used,
+        "documents_limit": plan.max_documents
     }
 
 # =========================================================
@@ -1771,4 +1859,33 @@ def change_plan(
             "max_ai_messages": new_plan.max_ai_messages,
             "max_documents": new_plan.max_documents
         }
+    }
+@app.get("/company/usage")
+def get_company_usage(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
+
+    if not usage:
+        raise HTTPException(
+            status_code=404,
+            detail="Usage data not found"
+        )
+
+    return {
+        "company_id": company_id,
+        "ai_messages_used": usage.ai_messages_used,
+        "customers_used": usage.customers_used,
+        "documents_used": usage.documents_used
     }
