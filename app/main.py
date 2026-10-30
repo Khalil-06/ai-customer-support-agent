@@ -10,8 +10,9 @@ import logging
 import os
 import shutil
 from datetime import datetime, timedelta
-from sympy import python
+from pathlib import Path
 
+import re
 from .database import engine, SessionLocal, Base
 from . import models
 from .auth import create_access_token, decode_access_token
@@ -209,17 +210,19 @@ def get_current_user(
             detail="Invalid or expired token"
         )
 
-
 # =========================================================
-# ROLE CHECK
+# RBAC - ROLE BASED ACCESS CONTROL
 # =========================================================
 
-def require_role(required_role: str):
 
+def require_role(*allowed_roles):
+    """Allow access only when the authenticated user's role is allowed."""
     def role_checker(
         current_user: dict = Depends(get_current_user)
     ):
-        if current_user["role"] != required_role:
+        user_role = current_user.get("role")
+
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=403,
                 detail="Access denied"
@@ -228,6 +231,38 @@ def require_role(required_role: str):
         return current_user
 
     return role_checker
+
+
+# =========================================================
+# SaaS SECURITY / DOCUMENT HELPERS
+# =========================================================
+
+ALLOWED_DOCUMENT_EXTENSIONS = {".pdf"}
+DOCUMENT_ROOT = Path("documents")
+DOCUMENT_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def require_company_user(current_user: dict):
+    """Validate that the authenticated user belongs to a company."""
+    if current_user.get("company_id") is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+    return int(current_user["company_id"])
+
+
+def get_company_document_names(db: Session, company_id: int):
+    rows = db.execute(
+        text("""
+            SELECT DISTINCT document_name
+            FROM document_chunks
+            WHERE company_id = :company_id
+            ORDER BY document_name
+        """),
+        {"company_id": company_id}
+    ).fetchall()
+    return [row[0] for row in rows]
 
 
 # =========================================================
@@ -294,7 +329,7 @@ def create_company(
 def create_customer(
     customer: CustomerCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -483,7 +518,7 @@ class ProductUpdate(BaseModel):
 def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -589,7 +624,7 @@ def update_product(
     product_id: int,
     product: ProductUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -629,7 +664,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -659,7 +694,7 @@ def delete_product(
 def create_order(
     order: OrderCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -745,7 +780,7 @@ def update_order(
     order_id: int,
     order: OrderUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -780,7 +815,7 @@ def update_order(
 def delete_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -811,7 +846,7 @@ def delete_order(
 def create_ticket(
     ticket: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -903,7 +938,7 @@ def update_ticket(
     ticket_id: int,
     ticket: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -942,7 +977,7 @@ def update_ticket(
 def delete_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -962,6 +997,187 @@ def delete_ticket(
 
     return {
         "message": "Ticket deleted successfully"
+    }
+
+
+# =========================================================
+# DOCUMENT / KNOWLEDGE BASE APIs
+# =========================================================
+
+@app.post("/documents/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+):
+    """Upload a PDF into the authenticated company's isolated knowledge base."""
+    company_id = require_company_user(current_user)
+
+    original_name = Path(file.filename or "").name
+    extension = Path(original_name).suffix.lower()
+
+    if not original_name or extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF documents are supported"
+        )
+
+    existing_names = get_company_document_names(db, company_id)
+    plan = db.query(models.Plan).join(
+        models.Company, models.Company.plan_id == models.Plan.id
+    ).filter(
+        models.Company.id == company_id
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Company plan not configured"
+        )
+
+    is_replacement = original_name in existing_names
+    if not is_replacement and len(existing_names) >= plan.max_documents:
+        raise HTTPException(
+            status_code=429,
+            detail="Document limit reached for your plan"
+        )
+
+    company_dir = DOCUMENT_ROOT / f"company_{company_id}"
+    company_dir.mkdir(parents=True, exist_ok=True)
+    file_path = company_dir / original_name
+
+    # Replace the previous version of the same document cleanly.
+    if is_replacement:
+        db.execute(
+            text("""
+                DELETE FROM document_chunks
+                WHERE company_id = :company_id
+                  AND document_name = :document_name
+            """),
+            {"company_id": company_id, "document_name": original_name}
+        )
+        db.commit()
+
+    try:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        store_pdf(
+            str(file_path),
+            original_name,
+            company_id
+        )
+
+        usage = db.query(models.CompanyUsage).filter(
+            models.CompanyUsage.company_id == company_id
+        ).first()
+        if not usage:
+            usage = models.CompanyUsage(company_id=company_id)
+            db.add(usage)
+            db.flush()
+
+        usage.documents_used = len(get_company_document_names(db, company_id))
+        db.commit()
+
+        return {
+            "message": "Document uploaded and indexed successfully",
+            "document_name": original_name,
+            "company_id": company_id,
+            "documents_used": usage.documents_used,
+            "documents_limit": plan.max_documents,
+            "replaced": is_replacement
+        }
+    except HTTPException:
+        db.rollback()
+        if file_path.exists():
+            file_path.unlink()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Document upload failed", exc_info=exc)
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(
+            status_code=500,
+            detail="Document upload failed"
+        )
+    finally:
+        await file.close()
+
+
+@app.get("/documents")
+def list_documents(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+):
+    company_id = require_company_user(current_user)
+    names = get_company_document_names(db, company_id)
+
+    return {
+        "company_id": company_id,
+        "documents": [
+            {"document_name": name} for name in names
+        ],
+        "count": len(names)
+    }
+
+
+@app.delete("/documents/{document_name}")
+def delete_document(
+    document_name: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "owner"))
+):
+    company_id = require_company_user(current_user)
+    safe_name = Path(document_name).name
+
+    if safe_name != document_name or Path(safe_name).suffix.lower() not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document name"
+        )
+
+    existing = db.execute(
+        text("""
+            SELECT COUNT(*)
+            FROM document_chunks
+            WHERE company_id = :company_id
+              AND document_name = :document_name
+        """),
+        {"company_id": company_id, "document_name": safe_name}
+    ).scalar()
+
+    if not existing:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    db.execute(
+        text("""
+            DELETE FROM document_chunks
+            WHERE company_id = :company_id
+              AND document_name = :document_name
+        """),
+        {"company_id": company_id, "document_name": safe_name}
+    )
+    db.commit()
+
+    file_path = DOCUMENT_ROOT / f"company_{company_id}" / safe_name
+    if file_path.exists():
+        file_path.unlink()
+
+    usage = db.query(models.CompanyUsage).filter(
+        models.CompanyUsage.company_id == company_id
+    ).first()
+    if usage:
+        usage.documents_used = len(get_company_document_names(db, company_id))
+        db.commit()
+
+    return {
+        "message": "Document deleted successfully",
+        "document_name": safe_name,
+        "company_id": company_id
     }
 
 
@@ -1284,13 +1500,12 @@ def login_user(
 
 @app.get("/admin-test")
 def admin_test(
-    current_user: dict = Depends(require_role("admin"))
+    current_user: dict = Depends(require_role("admin", "owner"))
 ):
     return {
-        "message": "Welcome Admin!",
+        "message": "Welcome Admin/Owner!",
         "user": current_user
     }
-
 
 # =========================================================
 # CONVERSATIONS
@@ -1300,7 +1515,7 @@ def admin_test(
 def create_conversation(
     conversation: ConversationCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -1350,7 +1565,7 @@ def create_conversation(
 def create_message(
     message: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
 
@@ -1500,6 +1715,144 @@ def check_ai_message_limit(db: Session, company_id: int):
         )
 
     return usage
+
+# =========================================================
+# AI BUSINESS HELPERS
+# =========================================================
+
+def get_order_from_message(
+    db: Session,
+    message: str,
+    company_id: int
+):
+    """
+    Detect an order ID from the customer's message
+    and return the order only if it belongs to the
+    same company.
+    """
+
+    order_keywords = [
+        "order",
+        "delivery",
+        "delivered",
+        "shipment",
+        "shipping",
+        "package",
+        "track",
+        "status"
+    ]
+
+    message_lower = message.lower()
+
+    # Not an order-related question
+    if not any(
+        keyword in message_lower
+        for keyword in order_keywords
+    ):
+        return None
+
+    # Find numeric order ID
+    match = re.search(r"\b\d{3,}\b", message)
+
+    if not match:
+        return None
+
+    order_id = int(match.group())
+
+    # Company-safe order lookup
+    order = (
+        db.query(models.Order)
+        .join(
+            models.Customer,
+            models.Order.customer_id == models.Customer.id
+        )
+        .filter(
+            models.Order.order_id == order_id,
+            models.Customer.company_id == company_id
+        )
+        .first()
+    )
+
+    return order
+
+
+def needs_human_support(message: str) -> bool:
+    """
+    Detect messages that should be handled by
+    a human support agent.
+    """
+
+    escalation_keywords = [
+        "human",
+        "agent",
+        "support team",
+        "talk to someone",
+        "talk to a person",
+        "customer service",
+        "complaint",
+        "complain",
+        "refund",
+        "damaged",
+        "broken",
+        "wrong product",
+        "not received",
+        "fraud",
+        "urgent",
+        "manager"
+    ]
+
+    message_lower = message.lower()
+
+    return any(
+        keyword in message_lower
+        for keyword in escalation_keywords
+    )
+
+
+def create_support_ticket(
+    db: Session,
+    customer_id: int,
+    company_id: int,
+    message: str
+):
+    """
+    Create a support ticket for human escalation.
+    """
+
+    # Get latest ticket for this company
+    last_ticket = (
+        db.query(models.Ticket)
+        .filter(
+            models.Ticket.company_id == company_id
+        )
+        .order_by(
+            models.Ticket.ticket_id.desc()
+        )
+        .first()
+    )
+
+    # Start ticket IDs at 10001
+    if last_ticket:
+        next_ticket_id = last_ticket.ticket_id + 1
+    else:
+        next_ticket_id = 10001
+
+    ticket = models.Ticket(
+        ticket_id=next_ticket_id,
+        customer_id=customer_id,
+        subject="Customer Support Request",
+        description=message,
+        status="Open",
+        company_id=company_id
+    )
+
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+
+    return ticket
+
+
 # =========================================================
 # AI CHAT
 # =========================================================
@@ -1508,9 +1861,13 @@ def check_ai_message_limit(db: Session, company_id: int):
 def chat(
     request: ChatRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner", "agent"))
 ):
     company_id = current_user["company_id"]
+
+    # -----------------------------------------------------
+    # Validate company
+    # -----------------------------------------------------
 
     if company_id is None:
         raise HTTPException(
@@ -1518,13 +1875,27 @@ def chat(
             detail="User is not associated with a company"
         )
 
-    # Check the company's AI usage limit before processing the request.
-    usage = check_ai_message_limit(db, company_id)
+    # -----------------------------------------------------
+    # Check AI usage limit
+    # -----------------------------------------------------
 
-    conversation = db.query(models.Conversation).filter(
-        models.Conversation.id == request.conversation_id,
-        models.Conversation.company_id == company_id
-    ).first()
+    usage = check_ai_message_limit(
+        db,
+        company_id
+    )
+
+    # -----------------------------------------------------
+    # Verify conversation belongs to this company
+    # -----------------------------------------------------
+
+    conversation = (
+        db.query(models.Conversation)
+        .filter(
+            models.Conversation.id == request.conversation_id,
+            models.Conversation.company_id == company_id
+        )
+        .first()
+    )
 
     if not conversation:
         raise HTTPException(
@@ -1532,7 +1903,10 @@ def chat(
             detail="Conversation not found"
         )
 
+    # -----------------------------------------------------
     # Save customer message
+    # -----------------------------------------------------
+
     customer_message = models.Message(
         conversation_id=request.conversation_id,
         sender="customer",
@@ -1543,14 +1917,71 @@ def chat(
     db.commit()
     db.refresh(customer_message)
 
-    # Generate AI response
-    ai_reply = generate_rag_response(request.message, company_id)
+    # =====================================================
+    # AI BUSINESS LOGIC
+    # =====================================================
 
-    # Count one successful AI message against the company's plan.
+    # -----------------------------------------------------
+    # 1. HUMAN SUPPORT / ESCALATION
+    # -----------------------------------------------------
+
+    if needs_human_support(request.message):
+
+        ticket = create_support_ticket(
+            db=db,
+            customer_id=conversation.customer_id,
+            company_id=company_id,
+            message=request.message
+        )
+
+        ai_reply = (
+            f"I've created a support ticket for you. "
+            f"Your ticket ID is #{ticket.ticket_id}. "
+            f"Our support team will review your request."
+        )
+
+    else:
+
+        # -------------------------------------------------
+        # 2. ORDER LOOKUP
+        # -------------------------------------------------
+
+        order = get_order_from_message(
+            db,
+            request.message,
+            company_id
+        )
+
+        if order:
+
+            ai_reply = (
+                f"Your order #{order.order_id} is currently "
+                f"{order.status.lower()}."
+            )
+
+        # -------------------------------------------------
+        # 3. RAG KNOWLEDGE BASE
+        # -------------------------------------------------
+
+        else:
+
+            ai_reply = generate_rag_response(
+                request.message,
+                company_id
+            )
+
+    # -----------------------------------------------------
+    # Count successful AI message
+    # -----------------------------------------------------
+
     usage.ai_messages_used += 1
+
     db.commit()
 
+    # -----------------------------------------------------
     # Save AI response
+    # -----------------------------------------------------
+
     ai_message = models.Message(
         conversation_id=request.conversation_id,
         sender="ai",
@@ -1561,12 +1992,21 @@ def chat(
     db.commit()
     db.refresh(ai_message)
 
+    # -----------------------------------------------------
     # Get conversation history
-    messages = db.query(models.Message).filter(
-        models.Message.conversation_id == request.conversation_id
-    ).order_by(
-        models.Message.id
-    ).all()
+    # -----------------------------------------------------
+
+    messages = (
+        db.query(models.Message)
+        .filter(
+            models.Message.conversation_id ==
+            request.conversation_id
+        )
+        .order_by(
+            models.Message.id
+        )
+        .all()
+    )
 
     history = [
         {
@@ -1576,107 +2016,17 @@ def chat(
         for msg in messages
     ]
 
+    # -----------------------------------------------------
+    # Final response
+    # -----------------------------------------------------
+
     return {
         "conversation_id": request.conversation_id,
         "user_message": request.message,
         "reply": ai_reply,
         "history": history
     }
-@app.post("/documents/upload")
-def upload_document(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    company_id = current_user["company_id"]
 
-    if company_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="User is not associated with a company"
-        )
-
-    # Get company
-    company = db.query(models.Company).filter(
-        models.Company.id == company_id
-    ).first()
-
-    if not company:
-        raise HTTPException(
-            status_code=404,
-            detail="Company not found"
-        )
-
-    # Get plan
-    plan = db.query(models.Plan).filter(
-        models.Plan.id == company.plan_id
-    ).first()
-
-    if not plan:
-        raise HTTPException(
-            status_code=500,
-            detail="Company plan not configured"
-        )
-
-    # Get usage record
-    usage = db.query(models.CompanyUsage).filter(
-        models.CompanyUsage.company_id == company_id
-    ).first()
-
-    if not usage:
-        usage = models.CompanyUsage(
-            company_id=company_id,
-            ai_messages_used=0,
-            customers_used=0,
-            documents_used=0
-        )
-
-        db.add(usage)
-        db.flush()
-
-    # Check document limit
-    if usage.documents_used >= plan.max_documents:
-        raise HTTPException(
-            status_code=429,
-            detail="Document limit reached for your plan"
-        )
-
-    # Validate PDF
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF files are allowed"
-        )
-
-    os.makedirs("documents", exist_ok=True)
-
-    file_path = os.path.join(
-        "documents",
-        f"{company_id}_{file.filename}"
-    )
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Store PDF chunks with company isolation
-    store_pdf(
-        file_path,
-        file.filename,
-        company_id
-    )
-
-    # Increase document usage
-    usage.documents_used += 1
-
-    db.commit()
-
-    return {
-        "message": "Document uploaded successfully",
-        "document_name": file.filename,
-        "company_id": company_id,
-        "documents_used": usage.documents_used,
-        "documents_limit": plan.max_documents
-    }
 
 # =========================================================
 # SAAS USAGE / PLAN
@@ -1736,7 +2086,10 @@ def get_saas_usage(
             WHERE company_id = :company_id
         """),
         {"company_id": company_id}
-    ).scalar()
+    ).scalar() or 0
+
+    usage.documents_used = document_count
+    db.commit()
 
     return {
         "company_id": company_id,
@@ -1806,7 +2159,7 @@ def get_current_plan(
 def change_plan(
     plan_name: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role("admin", "owner"))
 ):
     company_id = current_user["company_id"]
 
@@ -1814,13 +2167,6 @@ def change_plan(
         raise HTTPException(
             status_code=400,
             detail="User is not associated with a company"
-        )
-
-    # Only company owner can change the plan
-    if current_user["role"] != "owner":
-        raise HTTPException(
-            status_code=403,
-            detail="Only company owner can change the plan"
         )
 
     company = db.query(models.Company).filter(
@@ -1883,9 +2229,21 @@ def get_company_usage(
             detail="Usage data not found"
         )
 
+    document_count = db.execute(
+        text("""
+            SELECT COUNT(DISTINCT document_name)
+            FROM document_chunks
+            WHERE company_id = :company_id
+        """),
+        {"company_id": company_id}
+    ).scalar() or 0
+
+    usage.documents_used = document_count
+    db.commit()
+
     return {
         "company_id": company_id,
         "ai_messages_used": usage.ai_messages_used,
         "customers_used": usage.customers_used,
-        "documents_used": usage.documents_used
+        "documents_used": document_count
     }

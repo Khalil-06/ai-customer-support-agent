@@ -1,50 +1,46 @@
-import re
-
 from sqlalchemy import text
+from sentence_transformers import SentenceTransformer
 
 from .database import SessionLocal
 
 
-STOP_WORDS = {
-    "how", "many", "can", "i", "a", "an", "the",
-    "do", "to", "is", "are", "what", "when", "where",
-    "my", "me", "you", "your", "of", "for", "in", "on"
-}
+# Load embedding model once
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
-def search_documents(question: str, company_id: int):
-    words = re.findall(r"\b[a-zA-Z]+\b", question.lower())
+def search_documents(question: str, company_id: int, limit: int = 5):
 
-    keywords = [
-        word for word in words
-        if word not in STOP_WORDS and len(word) > 2
-    ]
+    # Convert question into a 384-dimensional embedding
+    question_embedding = embedding_model.encode(question).tolist()
 
-    if not keywords:
-        return []
+    # Convert to pgvector format
+    embedding_string = "[" + ",".join(
+        str(value) for value in question_embedding
+    ) + "]"
 
     db = SessionLocal()
 
     try:
-        conditions = []
-        params = {"company_id": company_id}
-
-        for index, keyword in enumerate(keywords):
-            key = f"keyword_{index}"
-            conditions.append(f"chunk_text ILIKE :{key}")
-            params[key] = f"%{keyword}%"
-
-        query = text(f"""
+        query = text("""
             SELECT
                 document_name,
-                chunk_text
+                chunk_text,
+                embedding <=> CAST(:embedding AS vector) AS distance
             FROM document_chunks
             WHERE company_id = :company_id
-              AND ({' OR '.join(conditions)})
-            LIMIT 5
+              AND embedding IS NOT NULL
+            ORDER BY embedding <=> CAST(:embedding AS vector)
+            LIMIT :limit
         """)
 
-        result = db.execute(query, params)
+        result = db.execute(
+            query,
+            {
+                "embedding": embedding_string,
+                "company_id": company_id,
+                "limit": limit
+            }
+        )
 
         return result.fetchall()
 
