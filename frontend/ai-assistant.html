@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AI Assistant | AI Support</title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+
+        body {
+            font-family: Inter, Arial, sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+        }
+
+
+        .app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+
+        /* =========================
+           SIDEBAR
+        ========================= */
+
+        .sidebar {
+            width: 245px;
+            background: #0f172a;
+            color: white;
+            padding: 24px 16px;
+
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+        }
+
+
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            padding: 0 12px;
+        }
+
+
+        .brand span {
+            color: #38bdf8;
+        }
+
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+
+        .nav-title {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0 12px;
+            margin-bottom: 8px;
+        }
+
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            color: #cbd5e1;
+            text-decoration: none;
+
+            padding: 11px 12px;
+            border-radius: 8px;
+
+            margin-bottom: 4px;
+
+            font-size: 14px;
+
+            transition: 0.2s;
+        }
+
+
+        .nav-link:hover {
+            background: #1e293b;
+            color: white;
+        }
+
+
+        .nav-link.active {
+            background: #1e293b;
+            color: #38bdf8;
+        }
+
+
+        /* =========================
+           MAIN
+        ========================= */
+
+        .main {
+            margin-left: 245px;
+            width: calc(100% - 245px);
+
+            height: 100vh;
+
+            display: flex;
+            flex-direction: column;
+        }
+
+
+        .topbar {
+            height: 72px;
+
+            background: white;
+
+            border-bottom: 1px solid #e2e8f0;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 0 32px;
+
+            flex-shrink: 0;
+        }
+
+
+        .topbar h1 {
+            font-size: 21px;
+            font-weight: 650;
+        }
+
+
+        .user-area {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+
+        .user-info {
+            text-align: right;
+        }
+
+
+        .user-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+
+        .user-role {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+
+        .logout-btn {
+            border: 1px solid #e2e8f0;
+            background: white;
+
+            padding: 8px 13px;
+
+            border-radius: 7px;
+
+            cursor: pointer;
+
+            font-size: 12px;
+        }
+
+
+        .logout-btn:hover {
+            background: #f1f5f9;
+        }
+
+
+        /* =========================
+           ASSISTANT LAYOUT
+        ========================= */
+
+        .assistant-layout {
+            flex: 1;
+
+            display: grid;
+
+            grid-template-columns: 280px 1fr;
+
+            min-height: 0;
+        }
+
+
+        /* =========================
+           CHAT SIDEBAR
+        ========================= */
+
+        .chat-sidebar {
+            background: white;
+
+            border-right: 1px solid #e2e8f0;
+
+            display: flex;
+            flex-direction: column;
+
+            min-height: 0;
+        }
+
+
+        .chat-sidebar-header {
+            padding: 20px;
+
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+
+        .chat-sidebar-header h3 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+
+        .chat-sidebar-header p {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+
+        .new-chat-btn {
+            width: 100%;
+
+            margin-top: 16px;
+
+            border: none;
+
+            background: #2563eb;
+            color: white;
+
+            padding: 10px;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+
+        .new-chat-btn:hover {
+            background: #1d4ed8;
+        }
+
+
+        .customer-section {
+            padding: 18px 20px;
+
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+
+        .customer-section label {
+            display: block;
+
+            font-size: 11px;
+
+            font-weight: 600;
+
+            color: #64748b;
+
+            margin-bottom: 7px;
+
+            text-transform: uppercase;
+        }
+
+
+        .customer-select {
+            width: 100%;
+
+            padding: 9px 10px;
+
+            border: 1px solid #dbe2ea;
+
+            border-radius: 7px;
+
+            background: white;
+
+            font-size: 12px;
+
+            outline: none;
+        }
+
+
+        .customer-select:focus {
+            border-color: #60a5fa;
+        }
+
+
+        .conversation-info {
+            padding: 18px 20px;
+
+            color: #64748b;
+
+            font-size: 12px;
+
+            line-height: 1.6;
+        }
+
+
+        .conversation-id {
+            margin-top: 8px;
+
+            display: inline-block;
+
+            background: #f1f5f9;
+
+            padding: 4px 8px;
+
+            border-radius: 5px;
+
+            color: #334155;
+
+            font-size: 11px;
+        }
+
+
+        /* =========================
+           CHAT AREA
+        ========================= */
+
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+
+            min-width: 0;
+            min-height: 0;
+
+            background: #f8fafc;
+        }
+
+
+        .chat-header {
+            background: white;
+
+            border-bottom: 1px solid #e2e8f0;
+
+            padding: 17px 24px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+
+        .assistant-identity {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+
+        .ai-avatar {
+            width: 40px;
+            height: 40px;
+
+            border-radius: 10px;
+
+            background: #eff6ff;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 20px;
+        }
+
+
+        .assistant-name {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+
+        .assistant-status {
+            font-size: 11px;
+            color: #16a34a;
+
+            margin-top: 3px;
+        }
+
+
+        .status-dot {
+            display: inline-block;
+
+            width: 7px;
+            height: 7px;
+
+            border-radius: 50%;
+
+            background: #22c55e;
+
+            margin-right: 5px;
+        }
+
+
+        .chat-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+
+        .small-btn {
+            border: 1px solid #dbe2ea;
+
+            background: white;
+
+            padding: 7px 10px;
+
+            border-radius: 7px;
+
+            cursor: pointer;
+
+            font-size: 11px;
+        }
+
+
+        .small-btn:hover {
+            background: #f1f5f9;
+        }
+
+
+        /* =========================
+           MESSAGES
+        ========================= */
+
+        .messages {
+            flex: 1;
+
+            overflow-y: auto;
+
+            padding: 28px;
+
+            display: flex;
+            flex-direction: column;
+
+            gap: 18px;
+        }
+
+
+        .welcome {
+            max-width: 600px;
+
+            margin: auto;
+
+            text-align: center;
+
+            color: #64748b;
+        }
+
+
+        .welcome-icon {
+            font-size: 48px;
+
+            margin-bottom: 14px;
+        }
+
+
+        .welcome h2 {
+            color: #0f172a;
+
+            font-size: 21px;
+
+            margin-bottom: 8px;
+        }
+
+
+        .welcome p {
+            font-size: 13px;
+
+            line-height: 1.6;
+
+            margin-bottom: 20px;
+        }
+
+
+        .suggestions {
+            display: flex;
+
+            flex-wrap: wrap;
+
+            justify-content: center;
+
+            gap: 8px;
+        }
+
+
+        .suggestion {
+            background: white;
+
+            border: 1px solid #dbe2ea;
+
+            padding: 9px 12px;
+
+            border-radius: 8px;
+
+            font-size: 11px;
+
+            cursor: pointer;
+
+            color: #334155;
+        }
+
+
+        .suggestion:hover {
+            border-color: #93c5fd;
+
+            background: #eff6ff;
+        }
+
+
+        .message-row {
+            display: flex;
+
+            width: 100%;
+        }
+
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+
+        .message-row.ai {
+            justify-content: flex-start;
+        }
+
+
+        .message-bubble {
+            max-width: 70%;
+
+            padding: 12px 15px;
+
+            border-radius: 12px;
+
+            font-size: 13px;
+
+            line-height: 1.55;
+
+            white-space: pre-wrap;
+
+            word-break: break-word;
+        }
+
+
+        .message-row.user
+        .message-bubble {
+
+            background: #2563eb;
+
+            color: white;
+
+            border-bottom-right-radius: 4px;
+        }
+
+
+        .message-row.ai
+        .message-bubble {
+
+            background: white;
+
+            border: 1px solid #e2e8f0;
+
+            color: #334155;
+
+            border-bottom-left-radius: 4px;
+        }
+
+
+        .message-meta {
+            font-size: 10px;
+
+            color: #94a3b8;
+
+            margin-bottom: 5px;
+        }
+
+
+        .user .message-meta {
+            text-align: right;
+        }
+
+
+        /* =========================
+           TYPING
+        ========================= */
+
+        .typing {
+            display: none;
+
+            align-items: center;
+
+            gap: 5px;
+
+            padding: 12px 15px;
+
+            background: white;
+
+            border: 1px solid #e2e8f0;
+
+            border-radius: 12px;
+
+            width: fit-content;
+        }
+
+
+        .typing.show {
+            display: flex;
+        }
+
+
+        .typing span {
+            width: 6px;
+            height: 6px;
+
+            background: #94a3b8;
+
+            border-radius: 50%;
+
+            animation: blink 1.2s infinite;
+        }
+
+
+        .typing span:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+
+        .typing span:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+
+        @keyframes blink {
+
+            0%, 80%, 100% {
+                opacity: 0.25;
+            }
+
+            40% {
+                opacity: 1;
+            }
+
+        }
+
+
+        /* =========================
+           INPUT
+        ========================= */
+
+        .composer {
+            background: white;
+
+            border-top: 1px solid #e2e8f0;
+
+            padding: 16px 24px;
+        }
+
+
+        .composer-box {
+            display: flex;
+
+            align-items: flex-end;
+
+            gap: 10px;
+
+            max-width: 1000px;
+
+            margin: auto;
+        }
+
+
+        #messageInput {
+            flex: 1;
+
+            resize: none;
+
+            min-height: 46px;
+            max-height: 130px;
+
+            border: 1px solid #dbe2ea;
+
+            border-radius: 10px;
+
+            padding: 13px 14px;
+
+            font-family: inherit;
+
+            font-size: 13px;
+
+            outline: none;
+        }
+
+
+        #messageInput:focus {
+            border-color: #60a5fa;
+
+            box-shadow:
+                0 0 0 3px
+                rgba(96, 165, 250, 0.12);
+        }
+
+
+        .send-btn {
+            width: 46px;
+            height: 46px;
+
+            border: none;
+
+            border-radius: 10px;
+
+            background: #2563eb;
+
+            color: white;
+
+            cursor: pointer;
+
+            font-size: 17px;
+        }
+
+
+        .send-btn:hover {
+            background: #1d4ed8;
+        }
+
+
+        .send-btn:disabled {
+            background: #94a3b8;
+
+            cursor: not-allowed;
+        }
+
+
+        .composer-hint {
+            max-width: 1000px;
+
+            margin: 7px auto 0;
+
+            font-size: 10px;
+
+            color: #94a3b8;
+        }
+
+
+        /* =========================
+           ERROR
+        ========================= */
+
+        .error-message {
+            display: none;
+
+            margin: 0 24px 12px;
+
+            padding: 10px 12px;
+
+            background: #fef2f2;
+
+            border: 1px solid #fecaca;
+
+            color: #dc2626;
+
+            border-radius: 8px;
+
+            font-size: 12px;
+        }
+
+
+        .error-message.show {
+            display: block;
+        }
+
+
+        /* =========================
+           RESPONSIVE
+        ========================= */
+
+        @media (max-width: 850px) {
+
+            .sidebar {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .assistant-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .chat-sidebar {
+                display: none;
+            }
+
+            .message-bubble {
+                max-width: 85%;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="app">
+
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            AI<span>Support</span>
+        </div>
+
+
+        <div class="nav-section">
+
+            <div class="nav-title">
+                Workspace
+            </div>
+
+
+            <a
+                href="dashboard.html"
+                class="nav-link"
+            >
+                📊 Overview
+            </a>
+
+
+            <a
+                href="customers.html"
+                class="nav-link"
+            >
+                👥 Customers
+            </a>
+
+
+            <a
+                href="products.html"
+                class="nav-link"
+            >
+                📦 Products
+            </a>
+
+
+            <a
+                href="#"
+                class="nav-link"
+            >
+                🛒 Orders
+            </a>
+
+
+            <a
+                href="tickets.html"
+                class="nav-link"
+            >
+                🎫 Tickets
+            </a>
+
+
+            <a
+                href="knowledge-base.html"
+                class="nav-link"
+            >
+                📚 Knowledge Base
+            </a>
+
+
+            <a
+                href="ai-assistant.html"
+                class="nav-link active"
+            >
+                🤖 AI Assistant
+            </a>
+
+        </div>
+
+
+        <div class="nav-section">
+
+            <div class="nav-title">
+                Account
+            </div>
+
+
+            <a
+                href="#"
+                class="nav-link"
+            >
+                ⚙️ Settings
+            </a>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+
+    <main class="main">
+
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <h1>
+                AI Assistant
+            </h1>
+
+
+            <div class="user-area">
+
+                <div class="user-info">
+
+                    <div
+                        class="user-name"
+                        id="userName"
+                    >
+                        User
+                    </div>
+
+                    <div
+                        class="user-role"
+                        id="userRole"
+                    >
+                        Owner
+                    </div>
+
+                </div>
+
+
+                <button
+                    class="logout-btn"
+                    id="logoutButton"
+                >
+                    Logout
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- ASSISTANT -->
+
+        <div class="assistant-layout">
+
+
+            <!-- CHAT SIDEBAR -->
+
+            <aside class="chat-sidebar">
+
+
+                <div class="chat-sidebar-header">
+
+                    <h3>
+                        Support Agent
+                    </h3>
+
+                    <p>
+                        Test your company's AI support agent.
+                    </p>
+
+
+                    <button
+                        class="new-chat-btn"
+                        id="newChatButton"
+                    >
+                        + New Conversation
+                    </button>
+
+                </div>
+
+
+                <div class="customer-section">
+
+                    <label>
+                        Customer
+                    </label>
+
+
+                    <select
+                        id="customerSelect"
+                        class="customer-select"
+                    >
+
+                        <option value="">
+                            Select customer
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="conversation-info">
+
+                    <strong>
+                        Current Conversation
+                    </strong>
+
+
+                    <div
+                        id="conversationStatus"
+                        style="margin-top: 8px;"
+                    >
+                        No conversation selected.
+                    </div>
+
+
+                    <span
+                        class="conversation-id"
+                        id="conversationId"
+                    >
+                        —
+                    </span>
+
+                </div>
+
+            </aside>
+
+
+            <!-- CHAT -->
+
+            <section class="chat-panel">
+
+
+                <div class="chat-header">
+
+                    <div class="assistant-identity">
+
+                        <div class="ai-avatar">
+                            🤖
+                        </div>
+
+
+                        <div>
+
+                            <div class="assistant-name">
+                                AI Support Agent
+                            </div>
+
+
+                            <div class="assistant-status">
+
+                                <span class="status-dot"></span>
+
+                                Online
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="chat-actions">
+
+                        <button
+                            class="small-btn"
+                            id="clearChatButton"
+                        >
+                            Clear Chat
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ERROR -->
+
+                <div
+                    class="error-message"
+                    id="errorMessage"
+                ></div>
+
+
+                <!-- MESSAGES -->
+
+                <div
+                    class="messages"
+                    id="messages"
+                >
+
+
+                    <div
+                        class="welcome"
+                        id="welcomeMessage"
+                    >
+
+                        <div class="welcome-icon">
+                            🤖
+                        </div>
+
+
+                        <h2>
+                            Your AI Support Agent
+                        </h2>
+
+
+                        <p>
+                            Ask questions about your company's
+                            knowledge base, check order status,
+                            or test customer support scenarios.
+                        </p>
+
+
+                        <div class="suggestions">
+
+                            <button
+                                class="suggestion"
+                                data-message="What is your refund policy?"
+                            >
+                                Ask about refund policy
+                            </button>
+
+
+                            <button
+                                class="suggestion"
+                                data-message="Where is my order 2001?"
+                            >
+                                Check an order
+                            </button>
+
+
+                            <button
+                                class="suggestion"
+                                data-message="I want to talk to a human agent."
+                            >
+                                Request human support
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="typing"
+                        id="typingIndicator"
+                    >
+
+                        <span></span>
+                        <span></span>
+                        <span></span>
+
+                    </div>
+
+
+                </div>
+
+
+                <!-- COMPOSER -->
+
+                <div class="composer">
+
+                    <div class="composer-box">
+
+                        <textarea
+                            id="messageInput"
+                            placeholder="Message your AI support agent..."
+                            rows="1"
+                            maxlength="1000"
+                        ></textarea>
+
+
+                        <button
+                            class="send-btn"
+                            id="sendButton"
+                            title="Send message"
+                        >
+                            ➤
+                        </button>
+
+                    </div>
+
+
+                    <div class="composer-hint">
+
+                        AI responses use your company's
+                        configured support logic and knowledge base.
+
+                    </div>
+
+                </div>
+
+
+            </section>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<script src="js/api.js"></script>
+<script src="js/ai-assistant.js"></script>
+
+</body>
+
+</html>

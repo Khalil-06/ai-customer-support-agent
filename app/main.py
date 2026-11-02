@@ -3,6 +3,7 @@ from .usage import check_ai_message_limit
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -40,7 +41,16 @@ app = FastAPI(
     description="Backend API for an AI-powered customer support system",
     version="1.0.0"
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =========================================================
 # CREATE DATABASE TABLES
@@ -421,7 +431,40 @@ def create_customer(
             "company_id": new_customer.company_id
         }
     }
+@app.get("/customers")
+def get_customers(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user.get("company_id")
 
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    customers = (
+        db.query(models.Customer)
+        .filter(models.Customer.company_id == company_id)
+        .order_by(models.Customer.id.desc())
+        .all()
+    )
+
+    return {
+        "company_id": company_id,
+        "count": len(customers),
+        "customers": [
+            {
+                "id": customer.id,
+                "name": customer.name,
+                "email": customer.email,
+                "phone": customer.phone,
+                "company_id": customer.company_id
+            }
+            for customer in customers
+        ]
+    }
 # =========================================================
 # CUSTOMER ORDERS
 # =========================================================
@@ -690,11 +733,82 @@ def delete_product(
 # ORDER APIs
 # =========================================================
 
+@app.get("/orders")
+def get_orders(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    orders = (
+        db.query(models.Order)
+        .filter(
+            models.Order.company_id == company_id
+        )
+        .order_by(models.Order.order_id.desc())
+        .all()
+    )
+
+    return {
+        "orders": [
+            {
+                "order_id": order.order_id,
+                "customer_id": order.customer_id,
+                "status": order.status,
+                "company_id": order.company_id
+            }
+            for order in orders
+        ]
+    }
+
+@app.get("/orders")
+def get_orders(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    orders = (
+        db.query(models.Order)
+        .filter(
+            models.Order.company_id == company_id
+        )
+        .order_by(
+            models.Order.order_id.desc()
+        )
+        .all()
+    )
+
+    return {
+        "orders": [
+            {
+                "order_id": order.order_id,
+                "customer_id": order.customer_id,
+                "status": order.status,
+                "company_id": order.company_id
+            }
+            for order in orders
+        ]
+    }
 @app.post("/orders")
 def create_order(
     order: OrderCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+    current_user: dict = Depends(
+        require_role("admin", "owner", "agent")
+    )
 ):
     company_id = current_user["company_id"]
 
@@ -780,7 +894,9 @@ def update_order(
     order_id: int,
     order: OrderUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+    current_user: dict = Depends(
+        require_role("admin", "owner", "agent")
+    )
 ):
     company_id = current_user["company_id"]
 
@@ -815,7 +931,9 @@ def update_order(
 def delete_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+    current_user: dict = Depends(
+        require_role("admin", "owner", "agent")
+    )
 ):
     company_id = current_user["company_id"]
 
@@ -837,10 +955,44 @@ def delete_order(
         "message": "Order deleted successfully"
     }
 
-
 # =========================================================
 # TICKET APIs
 # =========================================================
+@app.get("/tickets")
+def get_tickets(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    tickets = (
+        db.query(models.Ticket)
+        .filter(
+            models.Ticket.company_id == company_id
+        )
+        .order_by(models.Ticket.ticket_id.desc())
+        .all()
+    )
+
+    return {
+        "tickets": [
+            {
+                "ticket_id": ticket.ticket_id,
+                "customer_id": ticket.customer_id,
+                "subject": ticket.subject,
+                "description": ticket.description,
+                "status": ticket.status,
+                "company_id": ticket.company_id
+            }
+            for ticket in tickets
+        ]
+    }
 
 @app.post("/tickets")
 def create_ticket(

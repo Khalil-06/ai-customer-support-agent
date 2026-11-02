@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Products | AI Support</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="dashboard-page">
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+
+            <div class="brand-mark">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                    />
+                    <path
+                        d="M8 12L10.5 14.5L16 9"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    />
+                </svg>
+            </div>
+
+            <div class="brand-text">
+                <strong>AI Support</strong>
+                <span>Business Console</span>
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-section">
+
+            <span class="sidebar-label">WORKSPACE</span>
+
+            <nav class="sidebar-nav">
+
+                <a href="dashboard.html" class="nav-item">
+                    <span class="nav-icon">▦</span>
+                    <span>Overview</span>
+                </a>
+
+                <a href="customers.html" class="nav-item">
+                    <span class="nav-icon">♙</span>
+                    <span>Customers</span>
+                </a>
+
+                <a href="products.html" class="nav-item active">
+                    <span class="nav-icon">□</span>
+                    <span>Products</span>
+                </a>
+
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">◫</span>
+                    <span>Orders</span>
+                </a>
+
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">◇</span>
+                    <span>Tickets</span>
+                </a>
+
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">▤</span>
+                    <span>Knowledge Base</span>
+                </a>
+
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">✦</span>
+                    <span>AI Assistant</span>
+                </a>
+
+            </nav>
+
+        </div>
+
+
+        <div class="sidebar-footer">
+
+            <div class="workspace-mini">
+
+                <div class="workspace-avatar" id="workspaceAvatar">
+                    K
+                </div>
+
+                <div>
+
+                    <strong id="workspaceName">
+                        Owner
+                    </strong>
+
+                    <span>
+                        Company workspace
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <button
+                id="logoutButton"
+                class="logout-button"
+            >
+                <span>↪</span>
+                Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div class="breadcrumb">
+
+                <span>Workspace</span>
+                <span>/</span>
+                <strong>Products</strong>
+
+            </div>
+
+
+            <div class="topbar-right">
+
+                <div class="user-menu">
+
+                    <div
+                        class="user-avatar"
+                        id="userAvatar"
+                    >
+                        K
+                    </div>
+
+                    <div class="user-details">
+
+                        <strong id="userName">
+                            Owner
+                        </strong>
+
+                        <span id="userRole">
+                            Owner
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <section class="dashboard-content products-page">
+
+            <!-- PAGE HEADER -->
+
+            <div class="products-header">
+
+                <div>
+
+                    <span class="eyebrow">
+                        PRODUCT MANAGEMENT
+                    </span>
+
+                    <h1>Products</h1>
+
+                    <p>
+                        Manage the products your business sells and supports.
+                    </p>
+
+                </div>
+
+
+                <button
+                    id="openProductModal"
+                    class="primary-button"
+                >
+                    <span>+</span>
+                    Add product
+                </button>
+
+            </div>
+
+
+            <!-- SUMMARY -->
+
+            <div class="product-summary">
+
+                <div>
+
+                    <span>Total products</span>
+
+                    <strong id="productCount">
+                        --
+                    </strong>
+
+                </div>
+
+                <div>
+
+                    <span>Catalog status</span>
+
+                    <strong class="summary-status">
+                        Active
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- PRODUCT PANEL -->
+
+            <div class="product-panel">
+
+                <div class="product-toolbar">
+
+                    <div class="product-search">
+
+                        <span>⌕</span>
+
+                        <input
+                            type="text"
+                            id="productSearch"
+                            placeholder="Search products..."
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table class="product-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Product</th>
+
+                                <th>Product ID</th>
+
+                                <th>Price</th>
+
+                                <th>Actions</th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="productTableBody">
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <div
+                    id="emptyProducts"
+                    class="product-empty"
+                    style="display:none;"
+                >
+
+                    <div class="product-empty-icon">
+                        □
+                    </div>
+
+                    <h3>No products yet</h3>
+
+                    <p>
+                        Add your first product to build your business catalog.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="productMessage"
+                    class="product-message"
+                ></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- PRODUCT MODAL -->
+
+<div
+    id="productModal"
+    class="modal-overlay"
+>
+
+    <div class="product-modal">
+
+        <div class="modal-header">
+
+            <div>
+
+                <span class="eyebrow">
+                    PRODUCT
+                </span>
+
+                <h2 id="productModalTitle">
+                    Add product
+                </h2>
+
+                <p>
+                    Add a product to your business catalog.
+                </p>
+
+            </div>
+
+
+            <button
+                id="closeProductModal"
+                class="modal-close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <form id="productForm">
+
+            <div class="product-form-group">
+
+                <label for="productId">
+                    Product ID
+                </label>
+
+                <input
+                    id="productId"
+                    type="number"
+                    placeholder="101"
+                    required
+                >
+
+                <small>
+                    Use a unique ID for this product.
+                </small>
+
+            </div>
+
+
+            <div class="product-form-group">
+
+                <label for="productName">
+                    Product name
+                </label>
+
+                <input
+                    id="productName"
+                    type="text"
+                    placeholder="Premium Headphones"
+                    required
+                >
+
+            </div>
+
+
+            <div class="product-form-group">
+
+                <label for="productPrice">
+                    Price
+                </label>
+
+                <div class="price-input">
+
+                    <span>₹</span>
+
+                    <input
+                        id="productPrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="1499"
+                        required
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="productFormMessage"
+                class="form-message"
+            ></div>
+
+
+            <div class="modal-actions">
+
+                <button
+                    type="button"
+                    id="cancelProduct"
+                    class="secondary-button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    id="saveProduct"
+                    class="primary-button"
+                >
+                    Add product
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<!-- DELETE CONFIRMATION -->
+
+<div
+    id="deleteModal"
+    class="modal-overlay"
+>
+
+    <div class="delete-modal">
+
+        <div class="delete-icon">
+            !
+        </div>
+
+        <h2>Delete product?</h2>
+
+        <p>
+            This action cannot be undone. The product will be
+            permanently removed from your catalog.
+        </p>
+
+        <div class="modal-actions">
+
+            <button
+                id="cancelDelete"
+                class="secondary-button"
+            >
+                Cancel
+            </button>
+
+            <button
+                id="confirmDelete"
+                class="danger-button"
+            >
+                Delete product
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="js/api.js"></script>
+<script src="js/products.js"></script>
+
+</body>
+</html>

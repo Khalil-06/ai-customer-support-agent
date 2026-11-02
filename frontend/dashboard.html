@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dashboard | AI Support</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="dashboard-page">
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+            <div class="brand-mark">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z"
+                          stroke="currentColor"
+                          stroke-width="1.8"/>
+                    <path d="M8 12L10.5 14.5L16 9"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <div class="brand-text">
+                <strong>AI Support</strong>
+                <span>Business Console</span>
+            </div>
+        </div>
+
+
+        <div class="sidebar-section">
+            <span class="sidebar-label">WORKSPACE</span>
+
+            <nav class="sidebar-nav">
+
+                <a href="dashboard.html" class="nav-item active">
+                    <span class="nav-icon">▦</span>
+                    <span>Overview</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">♙</span>
+                    <span>Customers</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">□</span>
+                    <span>Products</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">◫</span>
+                    <span>Orders</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">◇</span>
+                    <span>Tickets</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">▤</span>
+                    <span>Knowledge Base</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">✦</span>
+                    <span>AI Assistant</span>
+                </a>
+
+            </nav>
+        </div>
+
+
+        <div class="sidebar-section sidebar-settings">
+
+            <span class="sidebar-label">ACCOUNT</span>
+
+            <a href="tickets.html" class="nav-item">
+                 <span>◇</span>
+                <span>Tickets</span>
+            </a>
+
+        </div>
+
+
+        <div class="sidebar-footer">
+
+            <div class="workspace-mini">
+                <div class="workspace-avatar" id="workspaceAvatar">K</div>
+
+                <div>
+                    <strong id="workspaceName">Owner</strong>
+                    <span>Company workspace</span>
+                </div>
+            </div>
+
+            <button id="logoutButton" class="logout-button">
+                <span>↪</span>
+                Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+
+            <div class="breadcrumb">
+                <span>Workspace</span>
+                <span>/</span>
+                <strong>Overview</strong>
+            </div>
+
+            <div class="topbar-right">
+
+                <button class="icon-button" title="Notifications">
+                    <span>♢</span>
+                    <i></i>
+                </button>
+
+                <div class="user-menu">
+
+                    <div class="user-avatar" id="userAvatar">
+                        K
+                    </div>
+
+                    <div class="user-details">
+                        <strong id="userName">Owner</strong>
+                        <span id="userRole">Owner</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- PAGE -->
+        <section class="dashboard-content">
+
+            <div class="page-heading">
+
+                <div>
+                    <span class="eyebrow">BUSINESS OVERVIEW</span>
+
+                    <h1 id="welcomeMessage">
+                        Welcome back
+                    </h1>
+
+                    <p>
+                        Monitor your customer support activity and AI usage.
+                    </p>
+                </div>
+
+                <div class="plan-pill" id="planBadge">
+                    FREE PLAN
+                </div>
+
+            </div>
+
+
+            <!-- STAT CARDS -->
+            <div class="stats-grid">
+
+                <div class="stat-card">
+
+                    <div class="stat-top">
+                        <span class="stat-label">Customers</span>
+
+                        <div class="stat-icon blue">
+                            ♙
+                        </div>
+                    </div>
+
+                    <div class="stat-value-row">
+                        <h2 id="customersUsed">--</h2>
+                        <span id="customersLimit">/ --</span>
+                    </div>
+
+                    <p class="stat-description">
+                        Active customers
+                    </p>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-top">
+                        <span class="stat-label">AI Messages</span>
+
+                        <div class="stat-icon purple">
+                            ✦
+                        </div>
+                    </div>
+
+                    <div class="stat-value-row">
+                        <h2 id="aiMessagesUsed">--</h2>
+                        <span id="aiMessagesLimit">/ --</span>
+                    </div>
+
+                    <p class="stat-description">
+                        Monthly AI conversations
+                    </p>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-top">
+                        <span class="stat-label">Knowledge Base</span>
+
+                        <div class="stat-icon orange">
+                            ▤
+                        </div>
+                    </div>
+
+                    <div class="stat-value-row">
+                        <h2 id="documentsUsed">--</h2>
+                        <span id="documentsLimit">/ --</span>
+                    </div>
+
+                    <p class="stat-description">
+                        Uploaded documents
+                    </p>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-top">
+                        <span class="stat-label">Current Plan</span>
+
+                        <div class="stat-icon green">
+                            ◇
+                        </div>
+                    </div>
+
+                    <div class="stat-value-row">
+                        <h2 id="currentPlan">--</h2>
+                    </div>
+
+                    <p class="stat-description" id="planPrice">
+                        ₹0 / month
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <!-- USAGE -->
+            <div class="section-heading">
+                <div>
+                    <h2>Usage overview</h2>
+                    <p>Track your current plan consumption.</p>
+                </div>
+            </div>
+
+
+            <div class="usage-grid">
+
+                <div class="panel">
+
+                    <div class="panel-header">
+
+                        <div>
+                            <h3>AI messages</h3>
+                            <p>Monthly message consumption</p>
+                        </div>
+
+                        <strong id="aiUsagePercentage">
+                            0%
+                        </strong>
+
+                    </div>
+
+                    <div class="usage-track">
+                        <div
+                            id="aiUsageProgress"
+                            class="usage-fill blue-fill">
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="panel">
+
+                    <div class="panel-header">
+
+                        <div>
+                            <h3>Customers</h3>
+                            <p>Customer capacity</p>
+                        </div>
+
+                        <strong id="customerUsagePercentage">
+                            0%
+                        </strong>
+
+                    </div>
+
+                    <div class="usage-track">
+                        <div
+                            id="customerUsageProgress"
+                            class="usage-fill purple-fill">
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ACCOUNT -->
+            <div class="section-heading account-heading">
+                <div>
+                    <h2>Workspace information</h2>
+                    <p>Details about your business account.</p>
+                </div>
+            </div>
+
+
+            <div class="panel account-panel">
+
+                <div class="account-item">
+                    <span>Email</span>
+                    <strong id="accountEmail">--</strong>
+                </div>
+
+                <div class="account-item">
+                    <span>Role</span>
+                    <strong id="accountRole">--</strong>
+                </div>
+
+                <div class="account-item">
+                    <span>Company ID</span>
+                    <strong id="companyId">--</strong>
+                </div>
+
+            </div>
+
+
+            <p id="dashboardMessage" class="dashboard-message"></p>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script src="js/api.js"></script>
+<script src="js/dashboard.js"></script>
+
+</body>
+</html>

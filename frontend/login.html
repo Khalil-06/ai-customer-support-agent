@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | AI Customer Support</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="auth-page">
+
+    <div class="auth-container">
+
+        <div class="auth-brand">
+            <div class="brand-icon">🤖</div>
+            <h1>AI Customer Support</h1>
+            <p>Smart support for growing businesses.</p>
+        </div>
+
+        <div class="auth-card">
+
+            <h2>Welcome back</h2>
+            <p class="auth-subtitle">
+                Login to your business dashboard
+            </p>
+
+            <form id="loginForm">
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        placeholder="Enter your email"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
+
+                <button type="submit" id="loginButton">
+                    Login
+                </button>
+
+                <p id="loginMessage" class="login-message"></p>
+
+            </form>
+
+        </div>
+
+        <p class="auth-footer">
+            AI Customer Support SaaS
+        </p>
+
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/login.js"></script>
+
+</body>
+</html>

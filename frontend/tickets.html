@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Tickets | SupportAI</title>
+
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+
+    <style>
+
+        .tickets-page {
+            padding: 28px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .page-title h1 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .page-title p {
+            margin: 7px 0 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .primary-btn {
+            border: none;
+            background: #2563eb;
+            color: white;
+            padding: 11px 18px;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .primary-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 20px;
+        }
+
+        .summary-label {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .summary-value {
+            color: #0f172a;
+            font-size: 25px;
+            font-weight: 700;
+        }
+
+        .tickets-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            padding: 18px 20px;
+            border-bottom: 1px solid #e2e8f0;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .search-box {
+            width: 350px;
+        }
+
+        .search-box input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 11px 14px;
+
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+
+            outline: none;
+            font-size: 14px;
+        }
+
+        .search-box input:focus {
+            border-color: #2563eb;
+
+            box-shadow:
+                0 0 0 3px
+                rgba(37, 99, 235, 0.1);
+        }
+
+        .status-filter {
+            padding: 10px 13px;
+
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+
+            background: white;
+            color: #334155;
+
+            outline: none;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .tickets-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tickets-table th {
+            text-align: left;
+
+            padding: 14px 20px;
+
+            background: #f8fafc;
+
+            color: #64748b;
+
+            font-size: 12px;
+            font-weight: 700;
+
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .tickets-table td {
+            padding: 16px 20px;
+
+            border-top:
+                1px solid #f1f5f9;
+
+            color: #334155;
+
+            font-size: 14px;
+
+            vertical-align: middle;
+        }
+
+        .tickets-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        .ticket-id {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .subject-cell {
+            max-width: 300px;
+        }
+
+        .subject-title {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .subject-description {
+            color: #64748b;
+            font-size: 12px;
+            margin-top: 4px;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+
+            padding: 5px 10px;
+
+            border-radius: 999px;
+
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-open {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .status-progress {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .status-resolved {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .status-closed {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .status-pending {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            border: 1px solid #e2e8f0;
+
+            background: white;
+
+            color: #475569;
+
+            padding: 7px 10px;
+
+            border-radius: 7px;
+
+            cursor: pointer;
+
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .action-btn:hover {
+            background: #f8fafc;
+        }
+
+        .delete-btn:hover {
+            border-color: #fecaca;
+
+            color: #dc2626;
+
+            background: #fef2f2;
+        }
+
+        .empty-state {
+            text-align: center;
+
+            padding: 65px 20px;
+
+            color: #64748b;
+        }
+
+        .empty-icon {
+            font-size: 42px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state h3 {
+            margin: 0 0 7px;
+            color: #334155;
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .message {
+            margin: 0 20px;
+
+            font-size: 13px;
+
+            min-height: 18px;
+        }
+
+        .message.success {
+            color: #15803d;
+        }
+
+        .message.error {
+            color: #dc2626;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+
+            background:
+                rgba(15, 23, 42, 0.45);
+
+            backdrop-filter: blur(4px);
+
+            display: none;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 20px;
+
+            z-index: 9999;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            width: 100%;
+            max-width: 500px;
+
+            background: white;
+
+            border-radius: 16px;
+
+            box-shadow:
+                0 25px 60px
+                rgba(15, 23, 42, 0.2);
+
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 20px 22px;
+
+            border-bottom:
+                1px solid #e2e8f0;
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+
+            font-size: 19px;
+
+            color: #0f172a;
+        }
+
+        .close-btn {
+            border: none;
+
+            background: transparent;
+
+            color: #64748b;
+
+            font-size: 24px;
+
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 17px;
+        }
+
+        .form-group label {
+            display: block;
+
+            margin-bottom: 7px;
+
+            color: #334155;
+
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+
+            box-sizing: border-box;
+
+            padding: 11px 12px;
+
+            border:
+                1px solid #cbd5e1;
+
+            border-radius: 8px;
+
+            outline: none;
+
+            font-size: 14px;
+
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: #2563eb;
+
+            box-shadow:
+                0 0 0 3px
+                rgba(37, 99, 235, 0.1);
+        }
+
+        .modal-footer {
+            padding: 16px 22px;
+
+            border-top:
+                1px solid #e2e8f0;
+
+            display: flex;
+
+            justify-content: flex-end;
+
+            gap: 10px;
+        }
+
+        .secondary-btn {
+            border:
+                1px solid #cbd5e1;
+
+            background: white;
+
+            color: #475569;
+
+            padding: 10px 16px;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            font-weight: 600;
+        }
+
+        .danger-btn {
+            border: none;
+
+            background: #dc2626;
+
+            color: white;
+
+            padding: 10px 16px;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+
+            .summary-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .toolbar-left {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+        }
+
+        @media (max-width: 600px) {
+
+            .tickets-page {
+                padding: 18px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+
+            <div class="brand-icon">
+                AI
+            </div>
+
+            <div>
+
+                <div class="brand-name">
+                    SupportAI
+                </div>
+
+                <div class="brand-subtitle">
+                    Customer Platform
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <nav class="sidebar-nav">
+
+            <a
+                href="dashboard.html"
+                class="nav-item"
+            >
+                <span>▦</span>
+                <span>Overview</span>
+            </a>
+
+            <a
+                href="customers.html"
+                class="nav-item"
+            >
+                <span>◉</span>
+                <span>Customers</span>
+            </a>
+
+            <a
+                href="products.html"
+                class="nav-item"
+            >
+                <span>□</span>
+                <span>Products</span>
+            </a>
+
+            <a
+                href="orders.html"
+                class="nav-item"
+            >
+                <span>▤</span>
+                <span>Orders</span>
+            </a>
+
+            <a
+                href="tickets.html"
+                class="nav-item active"
+            >
+                <span>◇</span>
+                <span>Tickets</span>
+            </a>
+
+            <a
+                href="#"
+                class="nav-item"
+            >
+                <span>▱</span>
+                <span>Knowledge Base</span>
+            </a>
+
+            <a
+                href="#"
+                class="nav-item"
+            >
+                <span>✦</span>
+                <span>AI Assistant</span>
+            </a>
+
+        </nav>
+
+
+        <div class="sidebar-bottom">
+
+            <button
+                class="nav-item"
+                id="logoutButton"
+            >
+                <span>↪</span>
+                <span>Logout</span>
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <main class="main-content">
+
+        <section class="tickets-page">
+
+            <div class="page-header">
+
+                <div class="page-title">
+
+                    <h1>
+                        Support Tickets
+                    </h1>
+
+                    <p>
+                        Manage customer issues,
+                        requests, and escalations.
+                    </p>
+
+                </div>
+
+
+                <button
+                    class="primary-btn"
+                    id="openTicketModal"
+                >
+                    + Create Ticket
+                </button>
+
+            </div>
+
+
+            <div class="summary-grid">
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Total Tickets
+                    </div>
+
+                    <div
+                        class="summary-value"
+                        id="totalTickets"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Open
+                    </div>
+
+                    <div
+                        class="summary-value"
+                        id="openTickets"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Pending
+                    </div>
+
+                    <div
+                        class="summary-value"
+                        id="pendingTickets"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Resolved
+                    </div>
+
+                    <div
+                        class="summary-value"
+                        id="resolvedTickets"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="tickets-card">
+
+                <div class="toolbar">
+
+                    <div class="toolbar-left">
+
+                        <div class="search-box">
+
+                            <input
+                                type="text"
+                                id="searchTickets"
+                                placeholder="Search ticket, subject, or customer..."
+                            >
+
+                        </div>
+
+                        <select
+                            id="statusFilter"
+                            class="status-filter"
+                        >
+
+                            <option value="all">
+                                All statuses
+                            </option>
+
+                            <option value="Open">
+                                Open
+                            </option>
+
+                            <option value="Pending">
+                                Pending
+                            </option>
+
+                            <option value="Resolved">
+                                Resolved
+                            </option>
+
+                            <option value="Closed">
+                                Closed
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="message"
+                    id="ticketsMessage"
+                ></div>
+
+
+                <div class="table-wrapper">
+
+                    <table class="tickets-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Ticket
+                                </th>
+
+                                <th>
+                                    Customer
+                                </th>
+
+                                <th>
+                                    Subject
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Actions
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody
+                            id="ticketsTableBody"
+                        ></tbody>
+
+                    </table>
+
+                </div>
+
+
+                <div
+                    class="empty-state"
+                    id="emptyState"
+                    style="display:none;"
+                >
+
+                    <div class="empty-icon">
+                        🎫
+                    </div>
+
+                    <h3>
+                        No tickets found
+                    </h3>
+
+                    <p>
+                        Create a ticket to start
+                        managing customer support.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- CREATE / EDIT MODAL -->
+
+<div
+    class="modal-overlay"
+    id="ticketModal"
+>
+
+    <div class="modal">
+
+        <div class="modal-header">
+
+            <h2 id="ticketModalTitle">
+                Create Ticket
+            </h2>
+
+            <button
+                class="close-btn"
+                id="closeTicketModal"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <form id="ticketForm">
+
+            <div class="modal-body">
+
+                <div
+                    class="message"
+                    id="ticketFormMessage"
+                ></div>
+
+
+                <div class="form-group">
+
+                    <label for="ticketId">
+                        Ticket ID
+                    </label>
+
+                    <input
+                        type="number"
+                        id="ticketId"
+                        min="1"
+                        required
+                        placeholder="Example: 10002"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="customerId">
+                        Customer ID
+                    </label>
+
+                    <input
+                        type="number"
+                        id="customerId"
+                        min="1"
+                        required
+                        placeholder="Example: 6"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="ticketSubject">
+                        Subject
+                    </label>
+
+                    <input
+                        type="text"
+                        id="ticketSubject"
+                        minlength="2"
+                        maxlength="200"
+                        required
+                        placeholder="Example: Refund request"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="ticketDescription">
+                        Description
+                    </label>
+
+                    <textarea
+                        id="ticketDescription"
+                        minlength="5"
+                        maxlength="2000"
+                        required
+                        placeholder="Describe the customer's issue..."
+                    ></textarea>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="ticketStatus">
+                        Status
+                    </label>
+
+                    <select
+                        id="ticketStatus"
+                        required
+                    >
+
+                        <option value="Open">
+                            Open
+                        </option>
+
+                        <option value="Pending">
+                            Pending
+                        </option>
+
+                        <option value="Resolved">
+                            Resolved
+                        </option>
+
+                        <option value="Closed">
+                            Closed
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="secondary-btn"
+                    id="cancelTicketModal"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    class="primary-btn"
+                    id="saveTicketButton"
+                >
+                    Save Ticket
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<!-- DELETE MODAL -->
+
+<div
+    class="modal-overlay"
+    id="deleteModal"
+>
+
+    <div class="modal">
+
+        <div class="modal-header">
+
+            <h2>
+                Delete Ticket
+            </h2>
+
+            <button
+                class="close-btn"
+                id="closeDeleteModal"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="modal-body">
+
+            <p style="color:#475569;">
+                Are you sure you want to delete
+                this ticket?
+                This action cannot be undone.
+            </p>
+
+            <div
+                class="message error"
+                id="deleteMessage"
+            ></div>
+
+        </div>
+
+
+        <div class="modal-footer">
+
+            <button
+                type="button"
+                class="secondary-btn"
+                id="cancelDelete"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                class="danger-btn"
+                id="confirmDelete"
+            >
+                Delete Ticket
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="js/api.js"></script>
+<script src="js/tickets.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Customers | AI Support</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="dashboard-page">
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+
+            <div class="brand-mark">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z"
+                          stroke="currentColor"
+                          stroke-width="1.8"/>
+                    <path d="M8 12L10.5 14.5L16 9"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <div class="brand-text">
+                <strong>AI Support</strong>
+                <span>Business Console</span>
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-section">
+
+            <span class="sidebar-label">WORKSPACE</span>
+
+            <nav class="sidebar-nav">
+
+                <a href="dashboard.html" class="nav-item">
+                    <span class="nav-icon">▦</span>
+                    <span>Overview</span>
+                </a>
+
+                <a href="customers.html" class="nav-item active">
+                    <span class="nav-icon">♙</span>
+                    <span>Customers</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">□</span>
+                    <span>Products</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">◫</span>
+                    <span>Orders</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">◇</span>
+                    <span>Tickets</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">▤</span>
+                    <span>Knowledge Base</span>
+                </a>
+
+                <a href="products.html" class="nav-item">
+                    <span class="nav-icon">✦</span>
+                    <span>AI Assistant</span>
+                </a>
+
+            </nav>
+
+        </div>
+
+
+        <div class="sidebar-footer">
+
+            <div class="workspace-mini">
+
+                <div class="workspace-avatar" id="workspaceAvatar">
+                    K
+                </div>
+
+                <div>
+                    <strong id="workspaceName">
+                        Owner
+                    </strong>
+
+                    <span>
+                        Company workspace
+                    </span>
+                </div>
+
+            </div>
+
+
+            <button
+                id="logoutButton"
+                class="logout-button"
+            >
+                <span>↪</span>
+                Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div class="breadcrumb">
+                <span>Workspace</span>
+                <span>/</span>
+                <strong>Customers</strong>
+            </div>
+
+            <div class="topbar-right">
+
+                <div class="user-menu">
+
+                    <div
+                        class="user-avatar"
+                        id="userAvatar"
+                    >
+                        K
+                    </div>
+
+                    <div class="user-details">
+
+                        <strong id="userName">
+                            Owner
+                        </strong>
+
+                        <span id="userRole">
+                            Owner
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <section class="dashboard-content customers-page">
+
+            <!-- PAGE HEADER -->
+            <div class="customers-header">
+
+                <div>
+
+                    <span class="eyebrow">
+                        CUSTOMER MANAGEMENT
+                    </span>
+
+                    <h1>Customers</h1>
+
+                    <p>
+                        Manage your customers and their support activity.
+                    </p>
+
+                </div>
+
+
+                <button
+                    id="openCustomerModal"
+                    class="primary-button"
+                >
+                    <span>+</span>
+                    Add customer
+                </button>
+
+            </div>
+
+
+            <!-- CUSTOMER SUMMARY -->
+            <div class="customer-summary">
+
+                <div>
+                    <span>Total customers</span>
+
+                    <strong id="customerCount">
+                        --
+                    </strong>
+                </div>
+
+                <div class="customer-limit">
+                    <span>Plan capacity</span>
+
+                    <strong id="customerLimit">
+                        --
+                    </strong>
+                </div>
+
+            </div>
+
+
+            <!-- CUSTOMER TABLE -->
+            <div class="customer-panel">
+
+                <div class="customer-toolbar">
+
+                    <div class="customer-search">
+
+                        <span>⌕</span>
+
+                        <input
+                            type="text"
+                            id="customerSearch"
+                            placeholder="Search customers..."
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table class="customer-table">
+
+                        <thead>
+
+                            <tr>
+                                <th>Customer</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>ID</th>
+                                <th>Action</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="customerTableBody">
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <div
+                    id="emptyCustomers"
+                    class="empty-state"
+                    style="display:none;"
+                >
+
+                    <div class="empty-icon">
+                        ♙
+                    </div>
+
+                    <h3>No customers yet</h3>
+
+                    <p>
+                        Add your first customer to start managing
+                        support conversations.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="customerMessage"
+                    class="customer-message"
+                ></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<!-- CUSTOMER DETAILS DRAWER -->
+
+<div id="customerDrawer" class="customer-drawer-overlay">
+
+    <aside class="customer-drawer">
+
+        <div class="drawer-header">
+
+            <div>
+                <span class="eyebrow">CUSTOMER PROFILE</span>
+                <h2>Customer details</h2>
+            </div>
+
+            <button
+                id="closeCustomerDrawer"
+                class="modal-close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="drawer-profile">
+
+            <div
+                id="drawerAvatar"
+                class="drawer-avatar"
+            >
+                K
+            </div>
+
+            <div>
+                <h3 id="drawerCustomerName">--</h3>
+                <p id="drawerCustomerEmail">--</p>
+            </div>
+
+        </div>
+
+
+        <!-- INFORMATION -->
+
+        <div class="drawer-section">
+
+            <div class="drawer-section-title">
+                CUSTOMER INFORMATION
+            </div>
+
+            <div class="detail-row">
+                <span>Email</span>
+                <strong id="drawerEmail">--</strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Phone</span>
+                <strong id="drawerPhone">--</strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Customer ID</span>
+                <strong id="drawerId">--</strong>
+            </div>
+
+        </div>
+
+
+        <!-- ORDERS -->
+
+        <div class="drawer-section">
+
+            <div class="drawer-section-heading">
+
+                <div>
+                    <div class="drawer-section-title">
+                        ORDERS
+                    </div>
+
+                    <span class="drawer-subtitle">
+                        Customer order history
+                    </span>
+                </div>
+
+                <span
+                    id="drawerOrderCount"
+                    class="count-badge"
+                >
+                    0
+                </span>
+
+            </div>
+
+
+            <div id="drawerOrders">
+
+                <div class="drawer-loading">
+                    Loading orders...
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- CONVERSATIONS -->
+
+        <div class="drawer-section">
+
+            <div class="drawer-section-heading">
+
+                <div>
+                    <div class="drawer-section-title">
+                        CONVERSATIONS
+                    </div>
+
+                    <span class="drawer-subtitle">
+                        Recent support conversations
+                    </span>
+                </div>
+
+                <span
+                    id="drawerConversationCount"
+                    class="count-badge"
+                >
+                    0
+                </span>
+
+            </div>
+
+
+            <div id="drawerConversations">
+
+                <div class="drawer-loading">
+                    Loading conversations...
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="drawerMessage"
+            class="drawer-message"
+        ></div>
+
+    </aside>
+
+</div>
+
+<!-- ADD CUSTOMER MODAL -->
+
+<div
+    id="customerModal"
+    class="modal-overlay"
+>
+
+    <div class="customer-modal">
+
+        <div class="modal-header">
+
+            <div>
+
+                <span class="eyebrow">
+                    NEW CUSTOMER
+                </span>
+
+                <h2>Add customer</h2>
+
+                <p>
+                    Add a customer to your business workspace.
+                </p>
+
+            </div>
+
+            <button
+                id="closeCustomerModal"
+                class="modal-close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <form id="customerForm">
+
+            <div class="form-row">
+
+                <div class="customer-form-group">
+
+                    <label for="customerName">
+                        Full name
+                    </label>
+
+                    <input
+                        id="customerName"
+                        type="text"
+                        placeholder="John Doe"
+                        required
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div class="customer-form-group">
+
+                <label for="customerEmail">
+                    Email
+                </label>
+
+                <input
+                    id="customerEmail"
+                    type="email"
+                    placeholder="customer@example.com"
+                    required
+                >
+
+            </div>
+
+
+            <div class="customer-form-group">
+
+                <label for="customerPhone">
+                    Phone
+                </label>
+
+                <input
+                    id="customerPhone"
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    required
+                >
+
+            </div>
+
+
+            <div
+                id="formMessage"
+                class="form-message"
+            ></div>
+
+
+            <div class="modal-actions">
+
+                <button
+                    type="button"
+                    id="cancelCustomer"
+                    class="secondary-button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    id="saveCustomer"
+                    class="primary-button"
+                >
+                    Add customer
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<script src="js/api.js"></script>
+<script src="js/customers.js"></script>
+
+</body>
+</html>
