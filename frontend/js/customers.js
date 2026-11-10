@@ -97,14 +97,18 @@ async function loadCustomers() {
 
     } catch (error) {
 
-        tableBody.innerHTML = "";
+    console.error("Customer loading failed:", error);
 
-        showMessage(
-            error.message,
-            true
-        );
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="5" class="loading-cell">
+                Failed to load customers: ${escapeHtml(error.message)}
+            </td>
+        </tr>
+    `;
 
-    }
+    showMessage(error.message, true);
+}
 
 }
 
@@ -709,4 +713,38 @@ function getStatusClass(status) {
 
     return "status-warning";
 
+}
+// ===============================
+// HELPER FUNCTIONS
+// ===============================
+
+// Logout
+function logout() {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+}
+
+// Show notification
+function showMessage(message, isError = false) {
+    const element = document.getElementById("customerMessage");
+
+    if (!element) {
+        console.log(message);
+        return;
+    }
+
+    element.textContent = message;
+    element.style.color = isError ? "#dc2626" : "#16a34a";
+}
+
+// Escape HTML
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
 }

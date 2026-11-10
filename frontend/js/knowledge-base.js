@@ -140,50 +140,36 @@ async function loadDocuments() {
 
 
 // LOAD USAGE
-
 async function loadUsage() {
-
     try {
+        const data = await apiRequest("/saas/usage");
 
-        const data =
-            await apiRequest("/saas/usage");
+        const usage = data.usage || {};
+        const limits = data.limits || {};
 
-        const usage =
-            data.usage || data;
-
-        const plan =
-            data.plan || {};
-
-        const used =
-            Number(
-                usage.documents_used ?? 0
-            );
-
-        const limit =
-            Number(
-                plan.max_documents ?? 0
-            );
-
-        documentCount.textContent =
-            used;
-
-        documentLimit.textContent =
-            limit;
-
-        documentsRemaining.textContent =
-            Math.max(limit - used, 0);
-
-    } catch (error) {
-
-        console.error(
-            "Failed to load usage:",
-            error
+        const used = Number(
+            usage.documents ?? usage.documents_used ?? 0
         );
 
+        const limit = Number(
+            limits.documents ??
+            limits.max_documents ??
+            data.plan?.max_documents ??
+            0
+        );
+
+        documentCount.textContent = used;
+        documentLimit.textContent = limit;
+
+        documentsRemaining.textContent = Math.max(
+            limit - used,
+            0
+        );
+
+    } catch (error) {
+        console.error("Failed to load usage:", error);
     }
-
 }
-
 
 // RENDER DOCUMENTS
 
