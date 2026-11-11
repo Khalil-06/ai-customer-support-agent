@@ -1,19 +1,15 @@
 from sqlalchemy import text
-from sentence_transformers import SentenceTransformer
 
 from .database import SessionLocal
-
-
-# Load embedding model once
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+from .embeddings import get_embedding_model
 
 
 def search_documents(question: str, company_id: int, limit: int = 5):
 
-    # Convert question into a 384-dimensional embedding
+    # Generate 384-dimensional question embedding
+    embedding_model = get_embedding_model()
     question_embedding = embedding_model.encode(question).tolist()
-
-    # Convert to pgvector format
+    # Convert embedding to pgvector format
     embedding_string = "[" + ",".join(
         str(value) for value in question_embedding
     ) + "]"

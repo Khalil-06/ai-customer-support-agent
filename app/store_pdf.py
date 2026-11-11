@@ -1,28 +1,26 @@
 from sqlalchemy import text
-from sentence_transformers import SentenceTransformer
 
 from .database import SessionLocal
+from .embeddings import get_embedding_model
 from .pdf_reader import extract_text_from_pdf
 from .chunker import chunk_text
 
 
-# Load embedding model once
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-
 def store_pdf(file_path: str, document_name: str, company_id: int):
+
     text_content = extract_text_from_pdf(file_path)
     chunks = chunk_text(text_content)
+
+    # Load the shared model when needed
+    embedding_model = get_embedding_model()
 
     db = SessionLocal()
 
     try:
         for chunk in chunks:
 
-            # Generate 384-dimensional embedding
             embedding = embedding_model.encode(chunk).tolist()
 
-            # Convert embedding to pgvector format
             embedding_string = "[" + ",".join(
                 str(value) for value in embedding
             ) + "]"
@@ -54,7 +52,7 @@ def store_pdf(file_path: str, document_name: str, company_id: int):
 
         db.commit()
 
-        print(f"Stored {len(chunks)} chunks with embeddings successfully.")
+        print(f"Stored {len(chunks)} chunks successfully.")
 
     except Exception:
         db.rollback()
