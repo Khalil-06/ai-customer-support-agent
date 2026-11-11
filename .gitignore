@@ -6,3 +6,5 @@ venv/
 .vscode/
 # Uploaded customer documents
 documents/
+# Database backup - never upload
+*.dump
