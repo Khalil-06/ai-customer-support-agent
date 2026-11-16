@@ -1,12 +1,13 @@
 FROM python:3.11-slim
 
-WORKDIR /APP
+WORKDIR /app
 
-ENV PYTHONDONTWRITEBYCODE=1
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 
-RUN pip install --default-timeout=300 --retries=10 --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu torch
+RUN pip install --default-timeout=300 --retries=10 --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu torch
 
 COPY requirements.txt .
 
