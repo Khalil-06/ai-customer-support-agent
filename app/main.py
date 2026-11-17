@@ -292,6 +292,7 @@ def home():
 # COMPANY APIs
 # =========================================================
 
+
 @app.post("/companies")
 def create_company(
     company: CompanyCreate,
@@ -307,13 +308,35 @@ def create_company(
             detail="Company email already registered"
         )
 
+    free_plan = db.query(models.Plan).filter(
+        models.Plan.name == "free"
+    ).first()
+
+    if not free_plan:
+        raise HTTPException(
+            status_code=500,
+            detail="Free plan not configured"
+        )
+
     new_company = models.Company(
         name=company.name,
         email=company.email,
-        website=company.website
+        website=company.website,
+        plan_id=free_plan.id
     )
 
     db.add(new_company)
+    db.flush()
+
+    subscription = models.Subscription(
+        company_id=new_company.id,
+        plan_id=free_plan.id,
+        status="trial",
+        started_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(days=14)
+    )
+
+    db.add(subscription)
     db.commit()
     db.refresh(new_company)
 
@@ -323,12 +346,14 @@ def create_company(
             "id": new_company.id,
             "name": new_company.name,
             "email": new_company.email,
-            "website": new_company.website
+            "website": new_company.website,
+            "plan": free_plan.name
+        },
+        "subscription": {
+            "status": subscription.status,
+            "expires_at": subscription.expires_at
         }
     }
-
-
-
 
 
 # =========================================================
@@ -1708,7 +1733,6 @@ def create_conversation(
         }
     }
 
-
 # =========================================================
 # MESSAGES
 # =========================================================
@@ -2307,6 +2331,37 @@ def get_current_plan(
             "max_documents": plan.max_documents
         }
     }
+@app.get("/saas/subscription")
+def get_subscription(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    company_id = current_user["company_id"]
+
+    if company_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with a company"
+        )
+
+    subscription = db.query(models.Subscription).filter(
+        models.Subscription.company_id == company_id
+    ).first()
+
+    if not subscription:
+        raise HTTPException(
+            status_code=404,
+            detail="Subscription not found"
+        )
+
+    return {
+        "subscription_id": subscription.id,
+        "company_id": subscription.company_id,
+        "plan_id": subscription.plan_id,
+        "status": subscription.status,
+        "started_at": subscription.started_at,
+        "expires_at": subscription.expires_at
+    }
 @app.put("/saas/plan")
 def change_plan(
     plan_name: str,
@@ -2341,14 +2396,37 @@ def change_plan(
             detail="Plan not found"
         )
 
-    company.plan_id = new_plan.id
+    subscription = db.query(models.Subscription).filter(
+        models.Subscription.company_id == company_id
+    ).first()
 
-    db.commit()
-    db.refresh(company)
+    if not subscription:
+        raise HTTPException(
+            status_code=404,
+            detail="Subscription not found. Please create a subscription first."
+        )
+
+    try:
+        company.plan_id = new_plan.id
+        subscription.plan_id = new_plan.id
+
+        db.commit()
+
+        db.refresh(company)
+        db.refresh(subscription)
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update company subscription"
+        )
 
     return {
-        "message": "Plan changed successfully",
+        "message": "Company plan and subscription updated successfully",
         "company_id": company.id,
+        "subscription_id": subscription.id,
+        "subscription_status": subscription.status,
         "plan": {
             "id": new_plan.id,
             "name": new_plan.name,
@@ -2358,6 +2436,7 @@ def change_plan(
             "max_documents": new_plan.max_documents
         }
     }
+    
 @app.get("/company/usage")
 def get_company_usage(
     db: Session = Depends(get_db),
