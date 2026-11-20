@@ -10,6 +10,7 @@ from sqlalchemy import text
 import logging
 import os
 import shutil
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1184,99 +1185,183 @@ def delete_ticket(
 async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role("admin", "owner", "agent"))
+    current_user: dict = Depends(
+        require_role("admin", "owner", "agent")
+    )
 ):
-    """Upload a PDF into the authenticated company's isolated knowledge base."""
-    company_id = require_company_user(current_user)
+    """Upload or safely replace a PDF in the company's knowledge base."""
 
-    original_name = Path(file.filename or "").name
-    extension = Path(original_name).suffix.lower()
-
-    if not original_name or extension not in ALLOWED_DOCUMENT_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF documents are supported"
-        )
-
-    existing_names = get_company_document_names(db, company_id)
-    plan = db.query(models.Plan).join(
-        models.Company, models.Company.plan_id == models.Plan.id
-    ).filter(
-        models.Company.id == company_id
-    ).first()
-
-    if not plan:
-        raise HTTPException(
-            status_code=500,
-            detail="Company plan not configured"
-        )
-
-    is_replacement = original_name in existing_names
-    if not is_replacement and len(existing_names) >= plan.max_documents:
-        raise HTTPException(
-            status_code=429,
-            detail="Document limit reached for your plan"
-        )
-
-    company_dir = DOCUMENT_ROOT / f"company_{company_id}"
-    company_dir.mkdir(parents=True, exist_ok=True)
-    file_path = company_dir / original_name
-
-    # Replace the previous version of the same document cleanly.
-    if is_replacement:
-        db.execute(
-            text("""
-                DELETE FROM document_chunks
-                WHERE company_id = :company_id
-                  AND document_name = :document_name
-            """),
-            {"company_id": company_id, "document_name": original_name}
-        )
-        db.commit()
+    temp_file_path = None
+    backup_file_path = None
+    file_path = None
+    had_original_file = False
+    file_replaced = False
 
     try:
-        with file_path.open("wb") as buffer:
+        # 1. Validate company and uploaded filename.
+        company_id = require_company_user(current_user)
+        original_name = Path(file.filename or "").name
+        extension = Path(original_name).suffix.lower()
+
+        if not original_name or extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF documents are supported"
+            )
+
+        # 2. Check the company's document plan and limit.
+        existing_names = get_company_document_names(db, company_id)
+
+        plan = db.query(models.Plan).join(
+            models.Company,
+            models.Company.plan_id == models.Plan.id
+        ).filter(
+            models.Company.id == company_id
+        ).first()
+
+        if not plan:
+            raise HTTPException(
+                status_code=500,
+                detail="Company plan not configured"
+            )
+
+        is_replacement = original_name in existing_names
+
+        if not is_replacement and len(existing_names) >= plan.max_documents:
+            raise HTTPException(
+                status_code=429,
+                detail="Document limit reached for your plan"
+            )
+
+        # 3. Prepare unique temporary and backup paths.
+        company_dir = DOCUMENT_ROOT / f"company_{company_id}"
+        company_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = company_dir / original_name
+        unique_id = uuid.uuid4().hex
+        temp_file_path = company_dir / f".{original_name}.{unique_id}.uploading"
+        backup_file_path = company_dir / f".{original_name}.{unique_id}.backup"
+
+        # Preserve the existing PDF before attempting a replacement.
+        had_original_file = file_path.exists()
+        if had_original_file:
+            shutil.copy2(file_path, backup_file_path)
+
+        # 4. Save the incoming PDF to a temporary file.
+        with temp_file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        store_pdf(
-            str(file_path),
-            original_name,
-            company_id
+        # 5. Index the new PDF using this route's database session.
+        # store_pdf performs DELETE + INSERT in the same transaction.
+        stored_chunks = store_pdf(
+            file_path=str(temp_file_path),
+            document_name=original_name,
+            company_id=company_id,
+            db=db
         )
 
+        if not stored_chunks:
+            raise ValueError("PDF indexing did not generate any chunks")
+
+        # 6. Replace the on-disk PDF only after successful indexing.
+        temp_file_path.replace(file_path)
+        file_replaced = True
+
+        # 7. Synchronize the document usage counter.
         usage = db.query(models.CompanyUsage).filter(
             models.CompanyUsage.company_id == company_id
         ).first()
+
         if not usage:
             usage = models.CompanyUsage(company_id=company_id)
             db.add(usage)
             db.flush()
 
-        usage.documents_used = len(get_company_document_names(db, company_id))
+        usage.documents_used = len(
+            get_company_document_names(db, company_id)
+        )
+
+        # 8. Commit chunk changes and usage together.
         db.commit()
+
+        # A backup is no longer needed after the database commit succeeds.
+        if backup_file_path.exists():
+            try:
+                backup_file_path.unlink()
+            except OSError:
+                logger.warning(
+                    "Could not remove PDF backup file: %s",
+                    backup_file_path
+                )
+
+        logger.info(
+            "Document uploaded successfully: company_id=%s, document=%s",
+            company_id,
+            original_name
+        )
 
         return {
             "message": "Document uploaded and indexed successfully",
             "document_name": original_name,
             "company_id": company_id,
+            "chunks_stored": stored_chunks,
             "documents_used": usage.documents_used,
             "documents_limit": plan.max_documents,
             "replaced": is_replacement
         }
+
     except HTTPException:
         db.rollback()
-        if file_path.exists():
-            file_path.unlink()
+
+        # Restore the old PDF if the new file had already replaced it.
+        if file_replaced and file_path is not None:
+            try:
+                if had_original_file and backup_file_path and backup_file_path.exists():
+                    backup_file_path.replace(file_path)
+                elif file_path.exists():
+                    file_path.unlink()
+            except OSError:
+                logger.exception("Could not restore the previous PDF")
+
+        if temp_file_path and temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+            except OSError:
+                logger.warning("Could not remove temporary upload: %s", temp_file_path)
+
+        if backup_file_path and backup_file_path.exists():
+            logger.warning("PDF backup retained for recovery: %s", backup_file_path)
+
         raise
-    except Exception as exc:
+
+    except Exception:
         db.rollback()
-        logger.exception("Document upload failed", exc_info=exc)
-        if file_path.exists():
-            file_path.unlink()
+        logger.exception("Document upload failed")
+
+        # Restore the previous PDF if the replacement step had completed.
+        if file_replaced and file_path is not None:
+            try:
+                if had_original_file and backup_file_path and backup_file_path.exists():
+                    backup_file_path.replace(file_path)
+                elif file_path.exists():
+                    file_path.unlink()
+            except OSError:
+                logger.exception("Could not restore the previous PDF")
+
+        if temp_file_path and temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+            except OSError:
+                logger.warning("Could not remove temporary upload: %s", temp_file_path)
+
+        if backup_file_path and backup_file_path.exists():
+            logger.warning("PDF backup retained for recovery: %s", backup_file_path)
+
         raise HTTPException(
             status_code=500,
             detail="Document upload failed"
         )
+
     finally:
         await file.close()
 
@@ -1341,7 +1426,7 @@ def delete_document(
 
     file_path = DOCUMENT_ROOT / f"company_{company_id}" / safe_name
     if file_path.exists():
-        file_path.unlink()
+       temp_file_path.unlink()
 
     usage = db.query(models.CompanyUsage).filter(
         models.CompanyUsage.company_id == company_id
