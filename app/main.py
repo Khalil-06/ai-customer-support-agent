@@ -20,6 +20,9 @@ from .auth import create_access_token, decode_access_token
 from .security import hash_password, verify_password
 from .rag import generate_rag_response
 from .store_pdf import store_pdf
+from .usage import check_ai_message_limit
+
+
 # =========================================================
 # LOGGING
 # =========================================================
@@ -411,12 +414,8 @@ def create_customer(
         db.add(usage)
         db.flush()
 
-    # Check customer limit
-    if usage.customers_used >= plan.max_cutomers:
-        raise HTTPException(
-            status_code=429,
-            detail="Customer limit reached for your plan"
-        )
+    # Check customer limit and subscription status
+    check_customer_limit(db, company_id)
 
     # Check duplicate email
     existing_customer = db.query(models.Customer).filter(
@@ -1853,45 +1852,6 @@ def get_customer_conversations(
         ]
     }
 
-def check_ai_message_limit(db: Session, company_id: int):
-    company = db.query(models.Company).filter(
-        models.Company.id == company_id
-    ).first()
-
-    if not company:
-        raise HTTPException(
-            status_code=404,
-            detail="Company not found"
-        )
-
-    usage = db.query(models.CompanyUsage).filter(
-        models.CompanyUsage.company_id == company_id
-    ).first()
-
-    if not usage:
-        usage = models.CompanyUsage(company_id=company_id)
-        db.add(usage)
-        db.commit()
-        db.refresh(usage)
-
-    plan = db.query(models.Plan).filter(
-        models.Plan.id == company.plan_id
-    ).first()
-
-    if not plan:
-        raise HTTPException(
-            status_code=500,
-            detail="Company plan not configured"
-        )
-
-    if usage.ai_messages_used >= plan.max_ai_messages:
-        raise HTTPException(
-            status_code=429,
-            detail="AI message limit reached for your plan"
-        )
-
-    return usage
-
 # =========================================================
 # AI BUSINESS HELPERS
 # =========================================================
@@ -2469,12 +2429,20 @@ def get_company_usage(
         {"company_id": company_id}
     ).scalar() or 0
 
+    # Get actual customer count
+    customer_count = db.query(models.Customer).filter(
+        models.Customer.company_id == company_id
+    ).count()
+
+    # Synchronize stored usage
+    usage.customers_used = customer_count
     usage.documents_used = document_count
+
     db.commit()
 
     return {
         "company_id": company_id,
         "ai_messages_used": usage.ai_messages_used,
-        "customers_used": usage.customers_used,
+        "customers_used": customer_count,
         "documents_used": document_count
-    }
+}
