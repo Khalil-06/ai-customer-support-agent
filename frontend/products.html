@@ -4,9 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Products | AI Support</title>
-
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -43,7 +41,6 @@
 
         </div>
 
-
         <div class="sidebar-section">
 
             <span class="sidebar-label">WORKSPACE</span>
@@ -65,22 +62,22 @@
                     <span>Products</span>
                 </a>
 
-                <a href="#" class="nav-item">
+                <a href="orders.html" class="nav-item">
                     <span class="nav-icon">◫</span>
                     <span>Orders</span>
                 </a>
 
-                <a href="#" class="nav-item">
+                <a href="tickets.html" class="nav-item">
                     <span class="nav-icon">◇</span>
                     <span>Tickets</span>
                 </a>
 
-                <a href="#" class="nav-item">
+                <a href="knowledge-base.html" class="nav-item">
                     <span class="nav-icon">▤</span>
                     <span>Knowledge Base</span>
                 </a>
 
-                <a href="#" class="nav-item">
+                <a href="ai-assistant.html" class="nav-item">
                     <span class="nav-icon">✦</span>
                     <span>AI Assistant</span>
                 </a>
@@ -88,7 +85,6 @@
             </nav>
 
         </div>
-
 
         <div class="sidebar-footer">
 
@@ -99,24 +95,13 @@
                 </div>
 
                 <div>
-
-                    <strong id="workspaceName">
-                        Owner
-                    </strong>
-
-                    <span>
-                        Company workspace
-                    </span>
-
+                    <strong id="workspaceName">Owner</strong>
+                    <span>Company workspace</span>
                 </div>
 
             </div>
 
-
-            <button
-                id="logoutButton"
-                class="logout-button"
-            >
+            <button id="logoutButton" class="logout-button">
                 <span>↪</span>
                 Logout
             </button>
@@ -125,42 +110,28 @@
 
     </aside>
 
-
-    <!-- MAIN -->
+    <!-- MAIN CONTENT -->
     <main class="main-content">
 
         <header class="topbar">
 
             <div class="breadcrumb">
-
                 <span>Workspace</span>
                 <span>/</span>
                 <strong>Products</strong>
-
             </div>
-
 
             <div class="topbar-right">
 
                 <div class="user-menu">
 
-                    <div
-                        class="user-avatar"
-                        id="userAvatar"
-                    >
+                    <div class="user-avatar" id="userAvatar">
                         K
                     </div>
 
                     <div class="user-details">
-
-                        <strong id="userName">
-                            Owner
-                        </strong>
-
-                        <span id="userRole">
-                            Owner
-                        </span>
-
+                        <strong id="userName">Owner</strong>
+                        <span id="userRole">Owner</span>
                     </div>
 
                 </div>
@@ -169,15 +140,12 @@
 
         </header>
 
-
         <section class="dashboard-content products-page">
 
             <!-- PAGE HEADER -->
-
             <div class="products-header">
 
                 <div>
-
                     <span class="eyebrow">
                         PRODUCT MANAGEMENT
                     </span>
@@ -187,9 +155,7 @@
                     <p>
                         Manage the products your business sells and supports.
                     </p>
-
                 </div>
-
 
                 <button
                     id="openProductModal"
@@ -201,36 +167,22 @@
 
             </div>
 
-
             <!-- SUMMARY -->
-
             <div class="product-summary">
 
                 <div>
-
                     <span>Total products</span>
-
-                    <strong id="productCount">
-                        --
-                    </strong>
-
+                    <strong id="productCount">--</strong>
                 </div>
 
                 <div>
-
                     <span>Catalog status</span>
-
-                    <strong class="summary-status">
-                        Active
-                    </strong>
-
+                    <strong class="summary-status">Active</strong>
                 </div>
 
             </div>
 
-
             <!-- PRODUCT PANEL -->
-
             <div class="product-panel">
 
                 <div class="product-toolbar">
@@ -249,36 +201,25 @@
 
                 </div>
 
-
                 <div class="table-wrapper">
 
                     <table class="product-table">
 
                         <thead>
-
                             <tr>
-
                                 <th>Product</th>
-
                                 <th>Product ID</th>
-
                                 <th>Price</th>
-
                                 <th>Actions</th>
-
                             </tr>
-
                         </thead>
 
-
                         <tbody id="productTableBody">
-
                         </tbody>
 
                     </table>
 
                 </div>
-
 
                 <div
                     id="emptyProducts"
@@ -298,7 +239,6 @@
 
                 </div>
 
-
                 <div
                     id="productMessage"
                     class="product-message"
@@ -312,9 +252,7 @@
 
 </div>
 
-
 <!-- PRODUCT MODAL -->
-
 <div
     id="productModal"
     class="modal-overlay"
@@ -325,10 +263,7 @@
         <div class="modal-header">
 
             <div>
-
-                <span class="eyebrow">
-                    PRODUCT
-                </span>
+                <span class="eyebrow">PRODUCT</span>
 
                 <h2 id="productModalTitle">
                     Add product
@@ -337,9 +272,7 @@
                 <p>
                     Add a product to your business catalog.
                 </p>
-
             </div>
-
 
             <button
                 id="closeProductModal"
@@ -349,7 +282,6 @@
             </button>
 
         </div>
-
 
         <form id="productForm">
 
@@ -372,7 +304,6 @@
 
             </div>
 
-
             <div class="product-form-group">
 
                 <label for="productName">
@@ -387,7 +318,6 @@
                 >
 
             </div>
-
 
             <div class="product-form-group">
 
@@ -412,12 +342,10 @@
 
             </div>
 
-
             <div
                 id="productFormMessage"
                 class="form-message"
             ></div>
-
 
             <div class="modal-actions">
 
@@ -445,9 +373,7 @@
 
 </div>
 
-
 <!-- DELETE CONFIRMATION -->
-
 <div
     id="deleteModal"
     class="modal-overlay"
@@ -488,7 +414,7 @@
 
 </div>
 
-
+<!-- JAVASCRIPT -->
 <script src="js/api.js"></script>
 <script src="js/products.js"></script>
 
