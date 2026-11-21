@@ -1,16 +1,20 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+// Production Backend URL
+const API_BASE_URL = "https://ai-customer-support-agent-030v.onrender.com";
 
 async function apiRequest(endpoint, options = {}) {
 
     const token = localStorage.getItem("access_token");
 
-    const headers = {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-    };
+    const headers = new Headers(options.headers || {});
 
+    // Authentication
     if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+        headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    // Support JSON and PDF/FormData uploads
+    if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
     }
 
     const response = await fetch(
@@ -21,7 +25,16 @@ async function apiRequest(endpoint, options = {}) {
         }
     );
 
-    const data = await response.json();
+    // Handle response
+    const responseText = await response.text();
+
+    let data = {};
+
+    try {
+        data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+        data = { detail: responseText };
+    }
 
     if (!response.ok) {
         throw new Error(
