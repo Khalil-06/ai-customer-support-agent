@@ -29,7 +29,7 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_recycle=300,
     pool_timeout=30
-)
+)git commit -m "Improve Neon database connection handling"
 
 SessionLocal = sessionmaker(
     autocommit=False,
