@@ -50,7 +50,7 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
-        "https://ai-customer-support-agent-1-0wmr.onrender.com",
+        "https://ai-customer-support-agent-1-0wmr.onrender.com",,
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -2531,3 +2531,4 @@ def get_company_usage(
         "customers_used": customer_count,
         "documents_used": document_count
 }
+
